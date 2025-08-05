@@ -114,7 +114,7 @@ fetch('data.json')
         <td>${item.countries ? item.countries.join(", ") : ""}</td>
         <td>${item.event}</td>
         <td>${item.tags ? item.tags.join(", ") : ""}</td>
-        <td><a href="${item.source}" target="_blank">リンク</a></td>
+        <td><a href="${item.source}" target="_blank">${getPlatformName(item.source)}</a></td>
       `;
             tbody.appendChild(row);
         });
@@ -129,4 +129,5 @@ const map = L.map('map').setView([20, 0], 2); // 世界中心
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
+
 
