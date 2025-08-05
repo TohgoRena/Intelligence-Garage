@@ -35,41 +35,54 @@ function toggleRegion(region) {
 }
 
 function renderRegions() {
-  const container = document.getElementById("regions");
-  container.innerHTML = "";
+    const container = document.getElementById("regions");
+    container.innerHTML = "";
 
-  // Home をテキストとして追加（ボタンではなく）
-  const homeDiv = document.createElement("div");
-  homeDiv.className = "region static-home";
-  homeDiv.textContent = "Home";
-  container.appendChild(homeDiv);
+    Object.entries(regions).forEach(([region, subdata]) => {
+        // 地域名
+        const regionDiv = document.createElement("div");
+        regionDiv.className = "region";
+        regionDiv.textContent = region;
+        regionDiv.onclick = () => toggleRegion(region);
+        container.appendChild(regionDiv);
 
-  Object.entries(regions).forEach(([region, countries]) => {
-    // カテゴリ（地域）表示
-    const regionDiv = document.createElement("div");
-    regionDiv.className = "region";
-    regionDiv.textContent = region;
-    regionDiv.onclick = () => toggleRegion(region);
-    container.appendChild(regionDiv);
+        // 展開
+        if (selectedRegion === region) {
+            // アジアだけ下位区分をループ
+            if (region === "アジア") {
+                Object.entries(subdata).forEach(([subregion, countries]) => {
+                    const subDiv = document.createElement("div");
+                    subDiv.className = "subregion";
+                    subDiv.textContent = subregion;
+                    container.appendChild(subDiv);
 
-    // 区切り線
-    const hr = document.createElement("hr");
-    hr.className = "region-divider";
-    container.appendChild(hr);
-
-    // 国リスト
-    if (selectedRegion === region) {
-      const ul = document.createElement("ul");
-      ul.className = "country-list";
-      countries.forEach((country) => {
-        const li = document.createElement("li");
-        li.className = "country-item";
-        li.textContent = country;
-        ul.appendChild(li);
-      });
-      container.appendChild(ul);
-    }
-  });
+                    const ul = document.createElement("ul");
+                    ul.className = "country-list";
+                    countries.forEach((country) => {
+                        const li = document.createElement("li");
+                        li.className = "country-item";
+                        li.textContent = country;
+                        ul.appendChild(li);
+                    });
+                    container.appendChild(ul);
+                });
+            } else if (Array.isArray(subdata)) {
+                const ul = document.createElement("ul");
+                ul.className = "country-list";
+                subdata.forEach((country) => {
+                    const li = document.createElement("li");
+                    li.className = "country-item";
+                    li.textContent = country;
+                    ul.appendChild(li);
+                });
+                container.appendChild(ul);
+            }
+        }
+        // 区切り線
+        const hr = document.createElement("hr");
+        hr.className = "region-divider";
+        container.appendChild(hr);
+    });
 }
 
 
@@ -100,5 +113,6 @@ fetch('data.json')
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
+
 
 
