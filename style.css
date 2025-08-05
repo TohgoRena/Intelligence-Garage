@@ -82,7 +82,7 @@ body.dark {
 /* 表データ */
 .table-container {
   height: 58%;
-  overflow: auto;
+  overflow: visible;
   border: 1px solid #444;
   border-radius: 6px;
   margin-top: 1rem;
@@ -92,6 +92,7 @@ table {
   width: 100%;
   border-collapse: collapse;
   color: #f8fafc;
+  overflow: visible;
 }
 
 th, td {
