@@ -1,16 +1,44 @@
 [
   {
-    "date": "2025-08-05",
-    "country": "ロシア",
-    "event": "軍事演習を開始",
-    "tag": "軍事",
-    "source": "https://example.com/russia-military"
+    "date": "2025-08-04",
+    "countries": ["パレスチナ", "フランス", "イギリス", "カナダ"],
+    "event": "パレスチナ国家承認が主要国で加速。フランスのマクロン大統領が7月24日に承認表明、29日にイギリスのスターマー首相、30日にカナダのカーニー首相が追随。G7で初の承認。",
+    "tags": ["外交", "国家承認", "パレスチナ"],
+    "source": "https://www.sankei.com/article/20250804-GQFIRBREU5MDTDBH6ODFHRPJ6I/"
+  },
+  {
+    "date": "2025-08-03",
+    "countries": ["バチカン", "アメリカ"],
+    "event": "新教皇レオ1世がローマで大規模なZ世代向けイベントを開催し、100万人以上が参加。教皇として若い世代との繋がりを強調。",
+    "tags": ["宗教", "バチカン", "若者", "教皇"],
+    "source": "https://edition.cnn.com/2025/08/03/europe/pope-leo-gen-z-rome-festival-intl"
+  },
+  {
+    "date": "2025-08-04",
+    "countries": ["アメリカ", "インド", "ロシア"],
+    "event": "トランプ米大統領がインドの対ロシア原油購入を理由に、インドへの関税大幅引き上げを表明。ロシアが停戦しなければ第三国にも2次関税を課す可能性。",
+    "tags": ["経済", "関税", "アメリカ", "インド", "ロシア"],
+    "source": "https://www.yomiuri.co.jp/world/20250805-OYT1T50070/"
+  },
+  {
+    "date": "2025-08-04",
+    "countries": ["ロシア", "ウクライナ", "アメリカ"],
+    "event": "ロシアが中距離ミサイル配備凍結を正式に解除。すでにウクライナで実戦使用。INF条約失効後も続いていた自主モラトリアムを撤回。",
+    "tags": ["軍事", "ロシア", "ウクライナ", "INF条約"],
+    "source": "https://www.jiji.com/jc/article?k=2025080500089&g=int"
   },
   {
     "date": "2025-08-05",
-    "country": "イラン",
-    "event": "外交会談を実施",
-    "tag": "外交",
-    "source": "https://example.com/iran-diplomacy"
+    "countries": ["日本", "オーストラリア"],
+    "event": "日本がオーストラリア海軍向けに65億ドル規模の軍艦契約を締結。戦後最大規模の防衛取引で、三菱重工業が多用途フリゲート艦を供給。",
+    "tags": ["安全保障", "軍事契約", "日本", "オーストラリア"],
+    "source": "https://www.reuters.com/world/asia-pacific/japan-clinches-landmark-65-billion-warship-deal-with-australia-2025-08-04/"
+  },
+  {
+    "date": "2025-08-04",
+    "countries": ["アメリカ"],
+    "event": "テキサス州で共和党と民主党がゲリマンダリングをめぐり対立。中間選挙を控え、選挙区区割り変更に反対する民主党議員に逮捕状。",
+    "tags": ["アメリカ", "政治", "ゲリマンダー", "中間選挙"],
+    "source": "https://www.afpbb.com/articles/-/3592111"
   }
 ]
