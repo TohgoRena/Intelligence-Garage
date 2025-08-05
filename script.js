@@ -27,7 +27,40 @@ const regions = {
     ]
 };
 
+const countryNameMap = {
+    "日本": "Japan",
+    "アメリカ": "United States",
+    "イギリス": "United Kingdom",
+    "ドイツ": "Germany",
+    "フランス": "France",
+    "ロシア": "Russia",
+    "オーストラリア": "Australia",
+    "カナダ": "Canada",
+    "中国": "China",
+    "韓国": "South Korea",
+    "北朝鮮": "North Korea",
+    "インド": "India",
+    "ウクライナ": "Ukraine",
+    "トルコ": "Turkey",
+    "イタリア": "Italy",
+    "スペイン": "Spain",
+    "ブラジル": "Brazil",
+    "アルゼンチン": "Argentina",
+    "イスラエル": "Israel",
+    "イラン": "Iran",
+    "サウジアラビア": "Saudi Arabia",
+    "メキシコ": "Mexico",
+    "エジプト": "Egypt",
+    "南アフリカ": "South Africa",
+    "カタール": "Qatar",
+    "アラブ首長国連邦": "United Arab Emirates",
+    "サウジアラビア": "Saudi Arabia",
+    "パレスチナ": "Palestine",
+    // 必要に応じてどんどん追加可能
+};
+
 let selectedRegion = null;
+let countryCoords = {};
 
 function toggleRegion(region) {
     selectedRegion = selectedRegion === region ? null : region;
@@ -86,48 +119,62 @@ function renderRegions() {
 }
 
 function getPlatformName(url) {
-  if (!url) return "";
-  if (url.includes("reuters.com")) return "Reuters";
-  if (url.includes("yahoo.com")) return "Yahoo";
-  if (url.includes("cnn.com")) return "CNN";
-  if (url.includes("sankei.com")) return "産経";
-  if (url.includes("yomiuri.co.jp")) return "読売";
-  if (url.includes("jiji.com")) return "時事";
-  if (url.includes("afpbb.com")) return "AFP";
-  // 必要なら他も追加
-  try {
-    return new URL(url).hostname.replace("www.", "");
-  } catch {
-    return "リンク";
-  }
+    if (!url) return "";
+    if (url.includes("reuters.com")) return "Reuters";
+    if (url.includes("yahoo.com")) return "Yahoo";
+    if (url.includes("cnn.com")) return "CNN";
+    if (url.includes("sankei.com")) return "産経";
+    if (url.includes("yomiuri.co.jp")) return "読売";
+    if (url.includes("jiji.com")) return "時事";
+    if (url.includes("afpbb.com")) return "AFP";
+    // 必要なら他も追加
+    try {
+        return new URL(url).hostname.replace("www.", "");
+    } catch {
+        return "リンク";
+    }
 }
 
-
-fetch('data.json')
-    .then(res => res.json())
-    .then(data => {
-        const tbody = document.getElementById('news-table-body');
-        data.forEach(item => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-        <td>${item.date}</td>
-        <td>${item.countries ? item.countries.join(", ") : ""}</td>
-        <td>${item.event}</td>
-        <td>${item.tags ? item.tags.join(", ") : ""}</td>
-        <td><a href="${item.source}" target="_blank">${getPlatformName(item.source)}</a></td>
-      `;
-            tbody.appendChild(row);
-        });
-    })
-    .catch(err => console.error('データ読み込みエラー:', err));
-
-renderRegions();
-
+// Leaflet地図の初期化
 const map = L.map('map').setView([20, 0], 2); // 世界中心
 
-// タイルレイヤーの追加（OpenStreetMapを使用）
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
+renderRegions();
 
+// country_coords.jsonを読み込んでからニュースデータ処理
+Promise.all([
+    fetch('country_coords.json').then(res => res.json()),
+    fetch('data.json').then(res => res.json())
+]).then(([coords, data]) => {
+    countryCoords = coords;
+
+    // テーブル描画
+    const tbody = document.getElementById('news-table-body');
+    data.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${item.date}</td>
+            <td>${item.countries ? item.countries.join(", ") : ""}</td>
+            <td>${item.event}</td>
+            <td>${item.tags ? item.tags.join(", ") : ""}</td>
+            <td><a href="${item.source}" target="_blank">${getPlatformName(item.source)}</a></td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // 外交イベントの国間を線で結ぶ
+    data.forEach(item => {
+        if (item.tags && item.tags.includes("外交") && item.countries && item.countries.length >= 2) {
+            const coordsList = item.countries.map(c => {
+                const enName = countryNameMap[c] || c;
+                return countryCoords[enName];
+            });
+            if (coordsList.every(Boolean)) {
+                L.polyline(coordsList, { color: 'blue', weight: 3, opacity: 0.7 }).addTo(map);
+            }
+        }
+    });
+}).catch(err => console.error('データ読み込みエラー:', err));
