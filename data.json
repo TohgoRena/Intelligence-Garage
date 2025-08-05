@@ -40,5 +40,61 @@
     "event": "テキサス州で共和党と民主党がゲリマンダリングをめぐり対立。中間選挙を控え、選挙区区割り変更に反対する民主党議員に逮捕状。",
     "tags": ["アメリカ", "政治", "ゲリマンダー", "中間選挙"],
     "source": "https://www.afpbb.com/articles/-/3592111"
+  },
+  {
+    "date": "2025-08-10",
+    "countries": ["日本", "オーストラリア"],
+    "event": "日本とオーストラリアが軍事協定に調印。",
+    "tags": ["外交", "軍事"],
+    "source": "https://www.reuters.com/world/asia-pacific/japan-australia-deal-2025-08-10/"
+  },
+  {
+    "date": "2025-08-11",
+    "countries": ["アメリカ", "中国"],
+    "event": "アメリカと中国が経済会談を開催。",
+    "tags": ["外交", "経済"],
+    "source": "https://www.cnn.com/2025/08/11/us-china-talks"
+  },
+  {
+    "date": "2025-08-12",
+    "countries": ["フランス", "イギリス"],
+    "event": "フランスとイギリスが新たな気候協定で合意。",
+    "tags": ["外交", "環境"],
+    "source": "https://www.bbc.com/news/world-europe-2025-08-12"
+  },
+  {
+    "date": "2025-08-13",
+    "countries": ["ドイツ", "ロシア"],
+    "event": "ドイツとロシアがエネルギー協力で覚書締結。",
+    "tags": ["外交", "エネルギー"],
+    "source": "https://www.dw.com/en/germany-russia-energy-2025-08-13"
+  },
+  {
+    "date": "2025-08-10",
+    "countries": ["Japan", "Australia"],
+    "event": "日本とオーストラリアが軍事協定に調印。",
+    "tags": ["外交", "軍事"],
+    "source": "https://www.reuters.com/world/asia-pacific/japan-australia-deal-2025-08-10/"
+  },
+  {
+    "date": "2025-08-11",
+    "countries": ["United States", "China"],
+    "event": "アメリカと中国が経済会談を開催。",
+    "tags": ["外交", "経済"],
+    "source": "https://www.cnn.com/2025/08/11/us-china-talks"
+  },
+  {
+    "date": "2025-08-12",
+    "countries": ["France", "United Kingdom"],
+    "event": "フランスとイギリスが新たな気候協定で合意。",
+    "tags": ["外交", "環境"],
+    "source": "https://www.bbc.com/news/world-europe-2025-08-12"
+  },
+  {
+    "date": "2025-08-13",
+    "countries": ["Germany", "Russia"],
+    "event": "ドイツとロシアがエネルギー協力で覚書締結。",
+    "tags": ["外交", "エネルギー"],
+    "source": "https://www.dw.com/en/germany-russia-energy-2025-08-13"
   }
 ]
