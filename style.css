@@ -56,7 +56,7 @@ body.dark {
 .main {
   flex: 1;
   padding: 1rem;
-  overflow: auto;
+  overflow: visible;
 }
 
 /* 世界地図エリア */
