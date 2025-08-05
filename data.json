@@ -1,0 +1,16 @@
+[
+  {
+    "date": "2025-08-05",
+    "country": "ロシア",
+    "event": "軍事演習を開始",
+    "tag": "軍事",
+    "source": "https://example.com/russia-military"
+  },
+  {
+    "date": "2025-08-05",
+    "country": "イラン",
+    "event": "外交会談を実施",
+    "tag": "外交",
+    "source": "https://example.com/iran-diplomacy"
+  }
+]

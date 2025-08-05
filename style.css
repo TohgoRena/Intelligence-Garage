@@ -1,0 +1,157 @@
+body.dark {
+  background-color: #121212;
+  color: #f0f0f0;
+}
+
+.header {
+  background: #1f2937;
+  color: #ffffff;
+  padding: 1rem;
+}
+
+.container {
+  display: flex;
+  height: calc(100vh - 64px); /* header分を引く */
+}
+
+/* 左メニュー */
+.sidebar {
+  width: 200px;
+  padding: 1rem;
+  background-color: #1a1a1a;
+  color: #fff;
+  font-size: 1.1rem; /* ← フォントサイズを少し大きく */
+  height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  border-right: 1px solid #333;
+}
+
+
+.sidebar ul,
+.country-list {
+  list-style-type: none; /* ・を消す */
+  padding-left: 0;
+  margin-left: 0;
+}
+
+.sidebar button,
+.sidebar .region {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0;
+  background: none;
+  border: none;
+  color: #f0f0f0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar .region:hover {
+  background-color: #2d3748;
+  border-radius: 4px;
+}
+
+/* メインエリア */
+.main {
+  flex: 1;
+  padding: 1rem;
+  overflow: auto;
+}
+
+/* 世界地図エリア */
+.map {
+  position: relative;
+  width: 100%;
+  padding-top: 50%; /* 高さ = 幅の50% → 2:1比率を実現 */
+  background: #2d3748;
+  border-radius: 6px;
+  border: 1px solid #444;
+  overflow: hidden;
+}
+
+#map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  border-radius: 4px;
+}
+
+/* 表データ */
+.table-container {
+  height: 58%;
+  overflow: auto;
+  border: 1px solid #444;
+  border-radius: 6px;
+  margin-top: 1rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #f8fafc;
+}
+
+th, td {
+  border: 1px solid #555;
+  padding: 0.5rem;
+  text-align: left;
+}
+
+th {
+  background-color: #2d3748;
+}
+
+/* Home テキスト（ボタン化しない） */
+.sidebar .static-home {
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+/* 地域ごとの区切り線 */
+.region-divider {
+  border: none;
+  border-top: 1px solid #555;
+  margin: 0.3rem 0 0.5rem 0;
+}
+
+/* 国名インデント表示 */
+.country-item {
+  padding-left: 1rem; /* インデントをつける */
+  font-size: 0.95rem;
+  color: #ccc;
+}
+
+/* スマホ向け対応 */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    border-right: none;
+    border-bottom: 1px solid #444;
+  }
+
+  .sidebar .region {
+    flex: 1 1 45%;
+  }
+
+  .main {
+    padding: 0.5rem;
+  }
+
+  .map {
+    padding-top: 50%;
+  }
+
+  #map {
+    height: 100%;
+  }
+}
