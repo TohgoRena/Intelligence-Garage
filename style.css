@@ -1,50 +1,88 @@
+/* General Body Styles */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  margin: 0;
+  overflow: hidden;
+}
+
 body.dark {
   background-color: #121212;
   color: #f0f0f0;
 }
 
+/* Header */
 .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   background: #1f2937;
   color: #ffffff;
   padding: 1rem;
+  box-sizing: border-box;
 }
 
+.header h1 {
+  margin: 0;
+  font-size: 1.5em;
+}
+
+.view-toggle button {
+  background-color: #333;
+  color: #ccc;
+  border: 1px solid #555;
+  padding: 8px 15px;
+  margin-left: 5px;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.view-toggle button:hover {
+  background-color: #444;
+}
+
+.view-toggle button.active {
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+
+/* Main Container */
 .container {
   display: flex;
-  height: calc(100vh - 64px); /* header分を引く */
+  height: calc(100vh - 64px);
 }
 
-/* 左メニュー */
+/* Sidebar */
 .sidebar {
-  width: 200px;
+  width: 250px;
   padding: 1rem;
   background-color: #1a1a1a;
   color: #fff;
-  font-size: 1.1rem; /* ← フォントサイズを少し大きく */
-  height: 100vh;
+  font-size: 1.1rem;
   overflow-y: auto;
   box-sizing: border-box;
   border-right: 1px solid #333;
 }
 
-
 .sidebar ul,
 .country-list {
-  list-style-type: none; /* ・を消す */
+  list-style-type: none;
   padding-left: 0;
   margin-left: 0;
 }
 
-.sidebar button,
 .sidebar .region {
   display: block;
   width: 100%;
-  padding: 0.4rem 0;
+  padding: 0.4rem 0.2rem;
   background: none;
   border: none;
   color: #f0f0f0;
   text-align: left;
   cursor: pointer;
+  font-weight: bold;
 }
 
 .sidebar .region:hover {
@@ -52,49 +90,65 @@ body.dark {
   border-radius: 4px;
 }
 
-/* メインエリア */
-.main {
-  flex: 1;
-  padding: 1rem;
-  overflow: visible;
+.country-item {
+  padding: 5px 5px 5px 1rem;
+  font-size: 0.95rem;
+  color: #ccc;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.2s;
 }
 
-/* 世界地図エリア */
-.map {
-  position: relative;
-  width: 100%;
-  padding-top: 50%; /* 高さ = 幅の50% → 2:1比率を実現 */
-  background: #2d3748;
-  border-radius: 6px;
-  border: 1px solid #444;
+.country-item:hover {
+    background-color: #2d3748;
+}
+
+.region-divider {
+  border: none;
+  border-top: 1px solid #555;
+  margin: 0.3rem 0 0.5rem 0;
+}
+
+/* ★★★ 再修正: Main Content Area ★★★ */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+  padding: 1rem; /* ← ご指摘のpaddingを追加 */
+  gap: 1rem;      /* ← 地図とテーブルの間の余白を追加 */
+}
+
+/* ★★★ 再修正: Map/Table Container ★★★ */
+.map-container,
+.table-container {
+  border-radius: 6px; /* コンテナの角を丸く */
+  border: 1px solid #444;
+  box-sizing: border-box;
+}
+
+.map-container {
+  height: 60%;
+  position: relative;
+  background: #000011;
+  overflow: hidden; /* 中の地図が角丸からはみ出ないように */
 }
 
 #map {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
   width: 100%;
-  border-radius: 4px;
+  height: 100%;
   cursor: grab;
-  background-color: #000011; /* 背景色を宇宙のような暗い青に */
 }
 
-/* 表データ */
 .table-container {
-  height: 58%;
-  overflow: visible;
-  border: 1px solid #444;
-  border-radius: 6px;
-  margin-top: 1rem;
+  height: 40%;
+  overflow-y: auto;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   color: #f8fafc;
-  overflow: visible;
 }
 
 th, td {
@@ -105,36 +159,45 @@ th, td {
 
 th {
   background-color: #2d3748;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
-/* Home テキスト（ボタン化しない） */
-.sidebar .static-home {
+.article-link {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid #4da6ff;
+  border-radius: 5px;
+  background-color: transparent;
+  color: #4da6ff;
+  text-decoration: none;
   font-weight: bold;
-  margin-bottom: 1rem;
+  font-size: 13px;
+  transition: all 0.2s ease-in-out;
 }
 
-/* 地域ごとの区切り線 */
-.region-divider {
-  border: none;
-  border-top: 1px solid #555;
-  margin: 0.3rem 0 0.5rem 0;
+.article-link:hover {
+  background-color: #4da6ff;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
 }
 
-/* 国名インデント表示 */
-.country-item {
-  padding-left: 1rem; /* インデントをつける */
-  font-size: 0.95rem;
-  color: #ccc;
+.article-link:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
-/* スマホ向け対応 */
 @media (max-width: 768px) {
   .container {
     flex-direction: column;
+    height: auto;
   }
 
   .sidebar {
     width: 100%;
+    height: auto;
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
@@ -147,46 +210,6 @@ th {
   }
 
   .main {
-    padding: 0.5rem;
+    height: calc(100vh - 200px);
   }
-
-  .map {
-    padding-top: 50%;
-  }
-
-  #map {
-    height: 100%;
-  }
-}
-
-/* 記事を読むリンクのボタンスタイル */
-.article-link {
-  /* 見た目の設定 */
-  display: inline-block;  /* paddingやmarginを正しく適用するため */
-  padding: 6px 12px;      /* 少し大きめの余白 */
-  border: 1px solid #ccc; /* やや薄めのボーダー */
-  border-radius: 5px;     /* 角を丸くする */
-  background-color: #fff; /* 背景色を白に */
-  color: #333;           /* 文字色を濃いグレーに */
-  text-decoration: none;  /* デフォルトの下線を消す */
-  font-weight: bold;      /* 文字を少し太くする */
-  font-size: 13px;        /* フォントサイズを少し小さく */
-  
-  /* アニメーションの設定 */
-  transition: all 0.2s ease-in-out; /* 全ての変更を0.2秒で滑らかに */
-}
-
-/* マウスが乗った時のスタイル */
-.article-link:hover {
-  background-color: #f0f0f0; /* 背景を少しグレーに */
-  color: #000;               /* 文字色を黒に */
-  border-color: #aaa;         /* ボーダーを少し濃く */
-  transform: translateY(-1px); /* 少しだけ上に浮き上がる動き */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 影をつけて立体感を出す */
-}
-
-/* クリックした瞬間のスタイル */
-.article-link:active {
-  transform: translateY(0); /* 浮き上がりを元に戻す */
-  box-shadow: none;         /* 影を消す */
 }
