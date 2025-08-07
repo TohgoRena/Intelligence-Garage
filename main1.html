@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intelligence Garage - 3D Globe</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body class="dark">
+  <div class="header">
+    <h1>Intelligence Garage</h1>
+  </div>
+  <div class="container">
+    <div class="sidebar">
+      <div id="regions"></div>
+    </div>
+    <div class="main">
+      <div class="map">
+        <div id="map"></div>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>国名</th>
+              <th>出来事</th>
+              <th>タグ</th>
+              <th>1次情報</th>
+            </tr>
+          </thead>
+          <tbody id="news-table-body">
+            <!-- データは script.js にて読み込み -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D Globeライブラリ (Leafletから変更) -->
+  <script src="https://unpkg.com/three"></script>
+  <script src="https://unpkg.com/globe.gl"></script>
+
+  <!-- JSZip JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- メインスクリプト -->
+  <script src="script.js"></script>
+</body>
+
+</html>
