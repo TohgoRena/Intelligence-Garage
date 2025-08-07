@@ -77,6 +77,8 @@ body.dark {
   height: 100%;
   width: 100%;
   border-radius: 4px;
+  cursor: grab;
+  background-color: #000011; /* 背景色を宇宙のような暗い青に */
 }
 
 /* 表データ */
@@ -155,4 +157,36 @@ th {
   #map {
     height: 100%;
   }
+}
+
+/* 記事を読むリンクのボタンスタイル */
+.article-link {
+  /* 見た目の設定 */
+  display: inline-block;  /* paddingやmarginを正しく適用するため */
+  padding: 6px 12px;      /* 少し大きめの余白 */
+  border: 1px solid #ccc; /* やや薄めのボーダー */
+  border-radius: 5px;     /* 角を丸くする */
+  background-color: #fff; /* 背景色を白に */
+  color: #333;           /* 文字色を濃いグレーに */
+  text-decoration: none;  /* デフォルトの下線を消す */
+  font-weight: bold;      /* 文字を少し太くする */
+  font-size: 13px;        /* フォントサイズを少し小さく */
+  
+  /* アニメーションの設定 */
+  transition: all 0.2s ease-in-out; /* 全ての変更を0.2秒で滑らかに */
+}
+
+/* マウスが乗った時のスタイル */
+.article-link:hover {
+  background-color: #f0f0f0; /* 背景を少しグレーに */
+  color: #000;               /* 文字色を黒に */
+  border-color: #aaa;         /* ボーダーを少し濃く */
+  transform: translateY(-1px); /* 少しだけ上に浮き上がる動き */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 影をつけて立体感を出す */
+}
+
+/* クリックした瞬間のスタイル */
+.article-link:active {
+  transform: translateY(0); /* 浮き上がりを元に戻す */
+  box-shadow: none;         /* 影を消す */
 }
