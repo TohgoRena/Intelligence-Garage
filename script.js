@@ -29,14 +29,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const PROXY_URL = 'https://corsproxy.io/?';
     let cameoCodes = {};
     let countryCoordinates = {};
+    let highlightedPolygon = null; 
 
     // --- 3D Globeの初期化 ---
     const globe = Globe()
       (document.getElementById('map'))
       .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
       .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+      .polygonsData([]) // 初期データは空に設定
+      .polygonCapColor(d => d === highlightedPolygon ? 'rgba(255, 255, 0, 0.2)' : 'rgba(200, 200, 200, 0.1)') // ハイライト時の色を変更
+      .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
+      .polygonStrokeColor(d => d === highlightedPolygon ? 'yellow' : '#ccc') // ハイライト時の線の色を変更
+      .polygonLabel(({ properties: d }) => `<b>${d.ADMIN} (${d.ISO_A3})</b>`)
       .arcsData([]) // 初期データは空に設定
-      // ★★★ 修正: 線の色をAvgToneに基づいて動的に決定 ★★★
       .arcColor(d => getAvgToneColor(d.event.avgTone))
       .arcStroke(0.4) // アークの線の太さ
       .arcDashLength(0.5) // 破線の長さ
@@ -71,6 +76,12 @@ document.addEventListener('DOMContentLoaded', () => {
         newsTableBody.innerHTML = '';
 
         try {
+            console.log('国境線データを読み込み中...');
+            const countriesRes = await fetch('https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson');
+            if (!countriesRes.ok) throw new Error(`国境データ(GeoJSON)の取得に失敗 (Status: ${countriesRes.status})`);
+            const countriesData = await countriesRes.json();
+            globe.polygonsData(countriesData.features);
+            console.log('国境線データを表示しました。');
             console.log('0/5: CAMEOコード定義ファイルを読み込み中...');
             const cameoResponse = await fetch('cameo-event-codes.json');
             if (!cameoResponse.ok) throw new Error(`CAMEOコード定義ファイルの取得に失敗 (Status: ${cameoResponse.status})`);
@@ -134,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             globe.arcsData(arcData);
             console.log(`5/5: 処理完了。${processedCount}件のイベントを読み込みました。`);
-
+            setupCountryClickListeners(countriesData.features);
         } catch (error) {
             console.error('エラーが発生しました:', error);
             const row = newsTableBody.insertRow();
@@ -316,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 処理の実行 ---
     fetchDataAndProcess();
-});
+
 
 
 const regions = {
@@ -387,55 +398,98 @@ function toggleRegion(region) {
     renderRegions();
 }
 
+function setupCountryClickListeners(countryFeatures) {
+    const regionsContainer = document.getElementById('regions');
+    if (!regionsContainer) return; // 要素がない場合は何もしない
+
+    // country-coordinates.jsonから「日本語名: ISOコード」の対応表を先に作成
+    const jpNameToIsoMap = Object.entries(countryCoordinates).reduce((acc, [iso, data]) => {
+        if (data.name_jp) {
+            acc[data.name_jp] = iso;
+        }
+        return acc;
+    }, {});
+
+    // 親要素である #regions に一度だけクリックイベントリスナーを設定
+    regionsContainer.addEventListener('click', (event) => {
+        // クリックされた要素が 'country-item' クラスを持っているか確認
+        if (event.target.classList.contains('country-item')) {
+            const countryNameJa = event.target.textContent.trim();
+            const isoCode = jpNameToIsoMap[countryNameJa]; // 日本語名からISOコードを取得
+
+            if (isoCode) {
+                // ISOコードを使って、地球儀のポリゴンデータ(feature)を探す
+                const targetCountryFeature = countryFeatures.find(f => f.properties.ISO_A3 === isoCode);
+
+                if (targetCountryFeature) {
+                    highlightCountry(targetCountryFeature);
+                    focusOnCountry(isoCode);
+                } else {
+                    // ポリゴンデータがなくても座標があればフォーカスを試みる
+                    console.warn(`'${countryNameJa}'の国境線データが見つかりませんでした。`);
+                    focusOnCountry(isoCode);
+                }
+            } else {
+                console.warn(`'${countryNameJa}'に対応する国データが'country-coordinates.json'内に見つかりません。`);
+            }
+        }
+    });
+}
+
+function highlightCountry(polygonFeature) {
+    if (highlightedPolygon) {
+    highlightedPolygon = null; // 前回ハイライトを解除
+    }
+    highlightedPolygon = polygonFeature;
+    globe.polygonCapColor(d => d === highlightedPolygon ? 'rgba(255, 255, 0, 0.2)' : 'rgba(200, 200, 200, 0.1)');
+    globe.polygonStrokeColor(d => d === highlightedPolygon ? 'yellow' : '#ccc');
+}
+
+function focusOnCountry(countryCode) {
+    const coords = countryCoordinates[countryCode];
+    if (coords) {
+        // globe.glの公式メソッドであるpointOfViewを使い、緯度・経度・高度を指定
+        globe.pointOfView({ lat: coords.lat, lng: coords.lng, altitude: 1.5 }, 1000); // 1秒かけて移動
+    } else {
+        console.warn(`国コード ${countryCode} の座標が見つかりません。`);
+    }
+}
+
 function renderRegions() {
     const container = document.getElementById("regions");
     container.innerHTML = "";
 
     Object.entries(regions).forEach(([region, subdata]) => {
-        // 地域名
-        const regionDiv = document.createElement("div");
-        regionDiv.className = "region";
-        regionDiv.textContent = region;
-        regionDiv.onclick = () => toggleRegion(region);
-        container.appendChild(regionDiv);
+    const regionDiv = document.createElement("div");
+    regionDiv.className = "region";
+    regionDiv.textContent = region;
+    regionDiv.onclick = () => toggleRegion(region);
+    container.appendChild(regionDiv);
 
-        // 展開
-        if (selectedRegion === region) {
-            // アジアだけ下位区分をループ
-            if (region === "アジア") {
-                Object.entries(subdata).forEach(([subregion, countries]) => {
-                    const subDiv = document.createElement("div");
-                    subDiv.className = "subregion";
-                    subDiv.textContent = subregion;
-                    container.appendChild(subDiv);
+    if (selectedRegion === region) {
+        const processCountries = (countries) => {
+            const ul = document.createElement("ul");
+            ul.className = "country-list";
+            countries.forEach((country) => {
+                const li = document.createElement("li");
+                li.className = "country-item"; 
+                li.textContent = country;
+                ul.appendChild(li);
+            });
+            container.appendChild(ul);
+        };
 
-                    const ul = document.createElement("ul");
-                    ul.className = "country-list";
-                    countries.forEach((country) => {
-                        const li = document.createElement("li");
-                        li.className = "country-item";
-                        li.textContent = country;
-                        ul.appendChild(li);
-                    });
-                    container.appendChild(ul);
-                });
-            } else if (Array.isArray(subdata)) {
-                const ul = document.createElement("ul");
-                ul.className = "country-list";
-                subdata.forEach((country) => {
-                    const li = document.createElement("li");
-                    li.className = "country-item";
-                    li.textContent = country;
-                    ul.appendChild(li);
-                });
-                container.appendChild(ul);
-            }
+        if (region === "アジア") {
+            Object.values(subdata).forEach(processCountries);
+        } else if (Array.isArray(subdata)) {
+            processCountries(subdata);
         }
-        // 区切り線
-        const hr = document.createElement("hr");
-        hr.className = "region-divider";
-        container.appendChild(hr);
-    });
+    }
+    const hr = document.createElement("hr");
+    hr.className = "region-divider";
+    container.appendChild(hr);
+});
 }
 
 renderRegions();
+});
