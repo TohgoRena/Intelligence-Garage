@@ -35,8 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
       (document.getElementById('map'))
       .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
       .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+      .polygonsData([]) // 初期データは空に設定
+      .polygonCapColor(() => 'rgba(200, 200, 200, 0.1)') // 国の表面の色 (薄いグレー)
+      .polygonSideColor(() => 'rgba(0, 0, 0, 0)')       // 国の側面の色 (透明)
+      .polygonStrokeColor(() => '#ccc')                 // 国境線の色
+      .polygonLabel(({ properties: d }) => `<b>${d.ADMIN} (${d.ISO_A3})</b>`) // 国にマウスオーバーした時のラベル
       .arcsData([]) // 初期データは空に設定
-      // ★★★ 修正: 線の色をAvgToneに基づいて動的に決定 ★★★
       .arcColor(d => getAvgToneColor(d.event.avgTone))
       .arcStroke(0.4) // アークの線の太さ
       .arcDashLength(0.5) // 破線の長さ
@@ -71,6 +75,12 @@ document.addEventListener('DOMContentLoaded', () => {
         newsTableBody.innerHTML = '';
 
         try {
+            console.log('国境線データを読み込み中...');
+            const countriesRes = await fetch('https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson');
+            if (!countriesRes.ok) throw new Error(`国境データ(GeoJSON)の取得に失敗 (Status: ${countriesRes.status})`);
+            const countriesData = await countriesRes.json();
+            globe.polygonsData(countriesData.features);
+            console.log('国境線データを表示しました。');
             console.log('0/5: CAMEOコード定義ファイルを読み込み中...');
             const cameoResponse = await fetch('cameo-event-codes.json');
             if (!cameoResponse.ok) throw new Error(`CAMEOコード定義ファイルの取得に失敗 (Status: ${cameoResponse.status})`);
