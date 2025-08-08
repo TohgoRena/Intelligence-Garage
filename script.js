@@ -9,6 +9,8 @@
  * - 3D (globe.gl) と 2D (Leaflet.js) の表示モード切替機能。
  * - GDELTの最新データを一度だけ取得し、表示切替時に再利用。
  * - ★線の色はイベントのルートカテゴリ(eventRootCode)に、テーブル行の背景はイベントの性質(GoldsteinScale)に連動。
+ * - ★2国間以外のイベントは、国ごとにイベント種別で集計し、ポイントとして地図上に表示。
+ * - ★マップ/地球儀の要素をクリックすると、対応するテーブル項目にフォーカスする機能を追加。
  * - CAMEOコードを日本語に変換して表示。
  * - サイドバーから国を選択すると、地図/地球儀がその国にフォーカス。
  * - 3Dモードでは国境線のハイライト機能も提供。
@@ -23,13 +25,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let globe = null; // 3D Globe instance
     let map = null;   // 2D Map instance
-    let polylines = []; // For 2D map lines
+
+    // 描画オブジェクトを管理する配列
+    let polylines = []; // 2Dマップの線
+    let singleCountryMarkers = []; // 2Dマップの単一国イベントマーカー
 
     let cameoCodes = {};
     let countryCoordinates = {};
     let allEvents = [];
     let allCountryFeatures = [];
     let highlightedPolygon = null;
+    let highlightedRow = null; // ★ ADDED: ハイライトされている行を追跡
 
     /**
      * ========================================
@@ -41,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await fetchDataAndProcess();
         renderRegions(); // サイドバーを生成
         setupCountryClickListeners();
+        setupLegends();
     }
 
     /**
@@ -92,8 +99,10 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('4/5: データを解析して表示準備...');
             allEvents = parseGdeltCsv(csvContent);
 
-            // 初期表示（2D）
+            // 初期表示（3D）
+            console.log("set globe");
             init3D();
+            console.log("end set globe");
 
         } catch (error) {
             console.error('エラーが発生しました:', error);
@@ -163,19 +172,40 @@ document.addEventListener('DOMContentLoaded', () => {
             .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
             .polygonStrokeColor(d => d === highlightedPolygon ? 'yellow' : '#ccc')
             .polygonLabel(({ properties: d }) => `<b>${d.ADMIN} (${d.ISO_A3})</b>`)
+            .labelsData([])
+            .labelLat('lat')
+            .labelLng('lng')
+            .labelLabel('label')
+            .labelText('countryName')
+            .labelSize('size')
+            .labelColor('color')
+            .labelDotRadius('size')
+            .labelAltitude('alt')
+            .labelResolution(3)
             .arcsData([])
-            .arcColor(d => getEventRootCodeColor(d.event.eventRootCode)) // ★変更: eventRootCodeで色分け
-            .arcStroke(0.4)
-            .arcDashLength(0.5)
-            .arcDashGap(0.2)
+            .arcColor(d => getEventRootCodeColor(d.event.eventRootCode))
             .arcDashAnimateTime(2500)
-            .arcLabel(d => { // ★変更: ラベル内容を更新
+            .arcLabel(d => {
                 const event = d.event;
                 const actor1Display = event.actor1.name || event.actor1.code || 'N/A';
                 const actor2Display = event.actor2.name || event.actor2.code || 'N/A';
                 const eventName = (cameoCodes[event.eventCode]) ? cameoCodes[event.eventCode].name_ja : '詳細不明';
                 const rootEventName = (cameoCodes[event.eventRootCode]) ? cameoCodes[event.eventRootCode].name_ja : '不明なカテゴリ';
                 return `<b>関係:</b> ${actor1Display} → ${actor2Display}<br><b>カテゴリ:</b> ${rootEventName} (${event.eventRootCode})<br><b>イベント詳細:</b> ${eventName}`;
+            })
+            .arcStroke(0.4)
+            .arcDashLength(0.5)
+            .arcDashGap(0.2)
+            // ★ ADDED: Click handlers for globe elements
+            .onArcClick(arc => {
+                if (arc.index !== undefined) {
+                    focusOnTableRow(arc.index);
+                }
+            })
+            .onLabelClick(label => {
+                if (label.index !== undefined) {
+                    focusOnTableRow(label.index);
+                }
             });
 
         globe.pointOfView({ altitude: 3.5 }, 1000);
@@ -203,57 +233,145 @@ document.addEventListener('DOMContentLoaded', () => {
      * ========================================
      */
     function renderDataOnMap() {
-        newsTableBody.innerHTML = ''; // テーブルをクリア
-        let processedCount = 0;
-
-        const arcData3D = [];
-        if (map) polylines.forEach(p => p.remove()); // 2Dの既存の線をクリア
+        // --- 1. 既存の描画をクリア ---
+        newsTableBody.innerHTML = '';
+        if (map) {
+            polylines.forEach(p => p.remove());
+            singleCountryMarkers.forEach(m => m.remove());
+        }
         polylines = [];
+        singleCountryMarkers = [];
 
-        allEvents.forEach(event => {
+        let bilateralEventCount = 0;
+        let singleCountryEventCount = 0;
+
+        // --- 2. データ構造を準備 ---
+        const arcData3D = [];
+        const pointsData3D = [];
+        const singleCountryAggregates = {};
+        const posCounts = {};
+
+        // --- 3. 全てのイベントをループ処理 ---
+        // ★ CHANGED: Add index to the loop
+        allEvents.forEach((event, index) => {
+            // ★ CHANGED: Pass index to the table function
+            addNewsToTable(event, index);
+
             const actor1Code = event.actor1.countryCode;
             const actor2Code = event.actor2.countryCode;
 
+            // --- A. 2国間イベント ---
             if (actor1Code && actor2Code && actor1Code !== actor2Code) {
                 const startCoords = countryCoordinates[actor1Code];
                 const endCoords = countryCoordinates[actor2Code];
 
                 if (startCoords && endCoords) {
-                    // 3D Globe用データ
+                    bilateralEventCount++;
                     if (globe) {
-                        arcData3D.push({
-                            startLat: startCoords.lat,
-                            startLng: startCoords.lng,
-                            endLat: endCoords.lat,
-                            endLng: endCoords.lng,
-                            event: event
-                        });
+                        // ★ CHANGED: Add index to arc data
+                        arcData3D.push({ startLat: startCoords.lat, startLng: startCoords.lng, endLat: endCoords.lat, endLng: endCoords.lng, event: event, index: index });
                     }
-                    // 2D Map用データ
                     if (map) {
                         const latlngs = [[startCoords.lat, startCoords.lng], [endCoords.lat, endCoords.lng]];
-                        const color = getEventRootCodeColor(event.eventRootCode); // ★変更: eventRootCodeで色分け
+                        const color = getEventRootCodeColor(event.eventRootCode);
                         const polyline = L.polyline(latlngs, { color: color, weight: 1.5, opacity: 0.6 }).addTo(map);
-
                         const eventName = (cameoCodes[event.eventCode]) ? cameoCodes[event.eventCode].name_ja : '詳細不明';
                         const rootEventName = (cameoCodes[event.eventRootCode]) ? cameoCodes[event.eventRootCode].name_ja : '不明なカテゴリ';
-                        const popupContent = `<b>関係:</b> ${countryCoordinates[actor1Code]?.name_jp} → ${countryCoordinates[actor2Code]?.name_jp}<br><b>カテゴリ:</b> ${rootEventName} (${event.eventRootCode})<br><b>イベント詳細:</b> ${eventName}`; // ★変更: ポップアップ内容を更新
+                        const popupContent = `<b>関係:</b> ${countryCoordinates[actor1Code]?.name_jp} → ${countryCoordinates[actor2Code]?.name_jp}<br><b>カテゴリ:</b> ${rootEventName} (${event.eventRootCode})<br><b>イベント詳細:</b> ${eventName}`;
                         polyline.bindPopup(popupContent);
+                        // ★ ADDED: Click listener for 2D polyline
+                        polyline.on('click', () => focusOnTableRow(index));
                         polylines.push(polyline);
                     }
+                }
+            }
+            // --- B. 単一国イベント ---
+            else {
+                const countryCode = event.actor1.countryCode || event.actor2.countryCode;
+                const rootCode = event.eventRootCode;
+                if (countryCode && rootCode && countryCoordinates[countryCode]) {
+                    singleCountryEventCount++;
 
-                    addNewsToTable(event);
-                    processedCount++;
+                    if (!singleCountryAggregates[countryCode]) singleCountryAggregates[countryCode] = {};
+                    if (!singleCountryAggregates[countryCode][rootCode]) singleCountryAggregates[countryCode][rootCode] = { count: 0 };
+                    singleCountryAggregates[countryCode][rootCode].count++;
+
+                    let lat, lng;
+                    if (!isNaN(event.actor1.lat) && !isNaN(event.actor1.lng)) {
+                        lat = event.actor1.lat;
+                        lng = event.actor1.lng;
+                    } else if (!isNaN(event.actor2.lat) && !isNaN(event.actor2.lng)) {
+                        lat = event.actor2.lat;
+                        lng = event.actor2.lng;
+                    } else {
+                        const fallbackCoords = countryCoordinates[countryCode];
+                        lat = fallbackCoords.lat;
+                        lng = fallbackCoords.lng;
+                    }
+                    if (!posCounts[lat]) posCounts[lat] = {};
+                    if (!posCounts[lat][lng]) posCounts[lat][lng] = 0;
+                    posCounts[lat][lng]++;
+
+                    if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return;
+
+                    const color = getEventRootCodeColor(rootCode);
+                    const countryName = countryCoordinates[countryCode]?.name_jp || countryCode;
+                    const eventName = (cameoCodes[event.eventCode]) ? cameoCodes[event.eventCode].name_ja : '詳細不明';
+                    const labelContent = `<b>国:</b> ${countryName}<br><b>イベント:</b> ${eventName} (${event.eventCode})`;
+
+                    if (globe) {
+                        // ★ CHANGED: Add index to point data
+                        pointsData3D.push({
+                            lat: lat + Math.sin(posCounts[lat][lng]) * (0.2 * posCounts[lat][lng] / 3),
+                            lng: lng + Math.cos(posCounts[lat][lng]) * (0.4 * posCounts[lat][lng] / 3),
+                            size: 0.2,
+                            color: color,
+                            label: labelContent,
+                            countryName: "",
+                            alt: 0.01,
+                            event: event,
+                            index: index
+                        });
+                    }
+
+                    if (map) {
+                        const radius = 5;
+                        const circle = L.circleMarker([lat, lng], {
+                            radius: radius,
+                            fillColor: color,
+                            color: "#fff",
+                            weight: 0.5,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).addTo(map);
+                        circle.bindPopup(labelContent);
+                        // ★ ADDED: Click listener for 2D circle marker
+                        circle.on('click', () => focusOnTableRow(index));
+                        singleCountryMarkers.push(circle);
+                    }
                 }
             }
         });
 
         if (globe) {
+            const dominantEventColorMap = {};
+            for (const countryCode in singleCountryAggregates) {
+                const events = singleCountryAggregates[countryCode];
+                if (!events || Object.keys(events).length === 0) continue;
+                const dominantRootCode = Object.keys(events).reduce((a, b) => events[a].count > events[b].count ? a : b);
+                const color = getEventRootCodeColor(dominantRootCode);
+                dominantEventColorMap[countryCode] = color.replace(/, \d\.\d+\)/, ', 0.35)');
+            }
+            globe.polygonCapColor(d => {
+                if (d === highlightedPolygon) return 'rgba(255, 255, 0, 0.5)';
+                return dominantEventColorMap[d.properties.ISO_A3] || 'rgba(200, 200, 200, 0.1)';
+            });
             globe.arcsData(arcData3D);
+            globe.labelsData(pointsData3D);
         }
 
-        console.log(`処理完了。${processedCount}件のイベントを読み込みました。`);
-        if (processedCount === 0) {
+        console.log(`処理完了。2国間イベント: ${bilateralEventCount}件、単一国イベント: ${singleCountryEventCount}件を読み込みました。`);
+        if (bilateralEventCount === 0 && singleCountryEventCount === 0) {
             newsTableBody.innerHTML = '<tr><td colspan="5">表示可能なイベントが見つかりませんでした。</td></tr>';
         }
     }
@@ -264,6 +382,27 @@ document.addEventListener('DOMContentLoaded', () => {
      * サイドバーとインタラクション
      * ========================================
      */
+
+    // ★ ADDED: Function to focus and highlight a table row
+    function focusOnTableRow(index) {
+        const rowId = `event-row-${index}`;
+        const row = document.getElementById(rowId);
+
+        if (row) {
+            // Remove highlight from the previously selected row
+            if (highlightedRow) {
+                highlightedRow.classList.remove('highlighted');
+            }
+
+            // Add highlight to the new row
+            row.classList.add('highlighted');
+            highlightedRow = row; // Track the new highlighted row
+
+            // Scroll to the row
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
     const regions = {
         "アジア": ["日本", "中国", "韓国", "北朝鮮", "インド", "ロシア", "ベトナム", "タイ", "マレーシア", "インドネシア", "フィリピン", "パキスタン", "イラン", "イラク", "シリア", "イスラエル", "トルコ", "サウジアラビア", "UAE", "カタール", "パレスチナ"],
         "ヨーロッパ": ["イギリス", "フランス", "ドイツ", "イタリア", "スペイン", "ウクライナ", "ポーランド", "オランダ", "ベルギー", "スイス", "オーストリア", "スウェーデン"],
@@ -318,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isoCode = jpNameToIsoMap[countryNameJa];
                 if (isoCode) {
                     focusOnCountry(isoCode);
-                    if (globe) { // 3Dモードの場合のみハイライト
+                    if (globe) {
                         const targetFeature = allCountryFeatures.find(f => f.properties.ISO_A3 === isoCode);
                         if (targetFeature) {
                            highlightedPolygon = targetFeature;
@@ -357,12 +496,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const columns = row.split('\t');
             if (columns.length < 61) continue;
             
-            const eventCode = columns[26]; // イベントコードを取得
+            const eventCode = columns[26];
             events.push({
-                actor1: { code: columns[5], name: columns[6], countryCode: columns[7] },
-                actor2: { code: columns[15], name: columns[16], countryCode: columns[17] },
+                actor1: { 
+                    code: columns[5], 
+                    name: columns[6], 
+                    countryCode: columns[7],
+                    lat: parseFloat(columns[38]), 
+                    lng: parseFloat(columns[39])
+                },
+                actor2: { 
+                    code: columns[15], 
+                    name: columns[16], 
+                    countryCode: columns[17],
+                    lat: parseFloat(columns[48]),
+                    lng: parseFloat(columns[49])
+                },
                 eventCode: eventCode,
-                eventRootCode: eventCode ? eventCode.substring(0, 2) : null, // ★追加: eventRootCodeを格納
+                eventRootCode: eventCode ? eventCode.substring(0, 2) : null,
                 goldsteinScale: parseFloat(columns[30]),
                 avgTone: parseFloat(columns[34]),
                 day: columns[1],
@@ -372,36 +523,41 @@ document.addEventListener('DOMContentLoaded', () => {
         return events;
     }
     
-    // ★★★新規: eventRootCodeに基づいて色を返す関数★★★
+    const alpha = 0.8; 
+    const rootCodeColors = {
+        '01': `rgba(178, 223, 138, ${alpha})`, '02': `rgba(166, 206, 227, ${alpha})`,
+        '03': `rgba(31, 120, 180, ${alpha})`,  '04': `rgba(118, 118, 118, ${alpha})`,
+        '05': `rgba(51, 160, 44, ${alpha})`,   '06': `rgba(152, 78, 163, ${alpha})`,
+        '07': `rgba(102, 194, 165, ${alpha})`, '08': `rgba(66, 146, 198, ${alpha})`,
+        '09': `rgba(253, 191, 111, ${alpha})`, '10': `rgba(255, 127, 0, ${alpha})`,
+        '11': `rgba(252, 141, 98, ${alpha})`,  '12': `rgba(231, 41, 138, ${alpha})`,
+        '13': `rgba(255, 255, 153, ${alpha})`, '14': `rgba(247, 129, 191, ${alpha})`,
+        '15': `rgba(177, 89, 40, ${alpha})`,   '16': `rgba(227, 26, 28, ${alpha})`,
+        '17': `rgba(255, 20, 147, ${alpha})`, '18': `rgba(128, 0, 0, ${alpha})`,
+        '19': `rgba(255, 0, 0, ${alpha})`,     '20': `rgba(0, 0, 0, ${alpha})`
+    };
+
     function getEventRootCodeColor(rootCode) {
-        const alpha = 0.8; 
-        const colors = {
-            // --- 協力的なイベント (青・緑系) ---
-            '01': `rgba(178, 223, 138, ${alpha})`, // #01 公式声明 (薄緑)
-            '02': `rgba(166, 206, 227, ${alpha})`, // #02 要請・アピール (水色)
-            '03': `rgba(31, 120, 180, ${alpha})`,  // #03 協力の意図を表明 (青)
-            '04': `rgba(118, 118, 118, ${alpha})`,  // #04 協議 (グレー)
-            '05': `rgba(51, 160, 44, ${alpha})`,   // #05 外交協力 (緑)
-            '06': `rgba(152, 78, 163, ${alpha})`,  // #06 物的協力 (紫)
-            '07': `rgba(102, 194, 165, ${alpha})`, // #07 支援提供 (青緑)
-            '08': `rgba(66, 146, 198, ${alpha})`,   // #08 譲歩 (濃い青)
-            '09': `rgba(253, 191, 111, ${alpha})`, // #09 調査 (オレンジ)
-            // --- 対立的なイベント (赤・黄系) ---
-            '10': `rgba(255, 127, 0, ${alpha})`,   // #10 要求 (濃いオレンジ)
-            '11': `rgba(252, 141, 98, ${alpha})`,  // #11 不承認 (薄い赤)
-            '12': `rgba(231, 41, 138, ${alpha})`,  // #12 拒否 (マゼンタ)
-            '13': `rgba(255, 255, 153, ${alpha})`, // #13 脅迫 (黄)
-            '14': `rgba(247, 129, 191, ${alpha})`, // #14 抗議 (ピンク)
-            '15': `rgba(177, 89, 40, ${alpha})`,   // #15 武力誇示 (茶色)
-            '16': `rgba(227, 26, 28, ${alpha})`,   // #16 関係縮小 (赤)
-            '17': `rgba(255, 20, 147, ${alpha})`, // #17 強制 (ディープレッド)
-            '18': `rgba(128, 0, 0, ${alpha})`,     // #18 襲撃 (マルーン)
-            '19': `rgba(255, 0, 0, ${alpha})`,     // #19 戦闘 (明るい赤)
-            '20': `rgba(0, 0, 0, ${alpha})`        // #20 非従来型の大規模暴力 (黒)
-        };
-        return colors[rootCode] || `rgba(200, 200, 200, ${alpha})`; // デフォルトは薄いグレー
+        return rootCodeColors[rootCode] || `rgba(200, 200, 200, ${alpha})`;
+    }
+    
+    function setupLegends() {
+        const legendsContainer = document.getElementById('legends');
+        if (!legendsContainer) return;
+        renderLegends(legendsContainer);
+        legendsContainer.addEventListener('click', () => {
+            legendsContainer.classList.toggle('hidden');
+        });
     }
 
+    function renderLegends(container) {
+        let legendHtml = '<h4>凡例 (クリックで切替)</h4>';
+        for (const [code, color] of Object.entries(rootCodeColors)) {
+            const label = (cameoCodes && cameoCodes[code]) ? cameoCodes[code].name_ja : `カテゴリ ${code}`;
+            legendHtml += `<div class="legend-item"><span class="legend-color-box" style="background-color: ${color};"></span><span>${label}</span></div>`;
+        }
+        container.innerHTML = legendHtml;
+    }
 
     function getGoldsteinBackgroundColor(score) {
         if (isNaN(score)) return 'transparent';
@@ -416,23 +572,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${alpha})`;
     }
-
-    function addNewsToTable(event) {
+    
+    // ★ CHANGED: Modified function to accept index and set a unique row ID
+    function addNewsToTable(event, index) {
         const row = newsTableBody.insertRow();
+        row.id = `event-row-${index}`; // Set unique ID for the row
         row.style.backgroundColor = getGoldsteinBackgroundColor(event.goldsteinScale);
 
         const date = event.day;
-        row.insertCell(0).textContent = date ? `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}` : 'N/A';
+        row.insertCell(0).textContent = date ? `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}` : '';
 
-        const actor1Name = countryCoordinates[event.actor1.countryCode]?.name_jp || event.actor1.countryCode;
-        const actor2Name = countryCoordinates[event.actor2.countryCode]?.name_jp || event.actor2.countryCode;
-        row.insertCell(1).textContent = `${actor1Name} → ${actor2Name}`;
+        const actor1Name = countryCoordinates[event.actor1.countryCode]?.name_jp || event.actor1.name  || event.actor1.countryCode || null;
+        const actor2Name = countryCoordinates[event.actor2.countryCode]?.name_jp || event.actor2.name  || event.actor2.countryCode || null;
+        if (actor1Name && actor2Name && actor1Name !== actor2Name){
+            row.insertCell(1).textContent = `${actor1Name} → ${actor2Name}`;
+        } else {
+            row.insertCell(1).textContent = `${actor1Name || actor2Name}`;
+        }
 
-        const actor1Display = event.actor1.name || '不明な主体';
-        const actor2Display = event.actor2.name || '不明な対象';
-        row.insertCell(2).textContent = `${actor1Display}が${actor2Display}に対し行動`;
+        const actor1Display = event.actor1.name;
+        const actor2Display = event.actor2.name;
+        let summary = '詳細不明';
+        if(actor1Display && actor2Display && actor1Display !== actor2Display) {
+            summary = `${actor1Display}が${actor2Display}に対し行動`;
+        } else if (actor1Display) {
+            summary = `${actor1Display}に関するイベント`;
+        } else if (actor2Display) {
+            summary = `${actor2Display}に関するイベント`;
+        }
+        row.insertCell(2).textContent = summary;
 
-        row.insertCell(3).textContent = (cameoCodes[event.eventCode]) ? cameoCodes[event.eventCode].name_ja : (event.eventCode || 'N/A');
+        row.insertCell(3).textContent = (cameoCodes[event.eventCode]) ? cameoCodes[event.eventCode].name_ja : (event.eventCode || '');
 
         const urlCell = row.insertCell(4);
         if (event.sourceUrl && event.sourceUrl !== 'NULL') {
@@ -444,18 +614,14 @@ document.addEventListener('DOMContentLoaded', () => {
             link.className = 'article-link';
             urlCell.appendChild(link);
         } else {
-            urlCell.textContent = 'N/A';
+            urlCell.textContent = '';
         }
     }
 
     // --- 処理の実行 ---
     main();
-    
-
     // --- リサイズ処理 ---
-    // 地図コンテナのサイズ変更を監視し、中身をリサイズする
     const resizeObserver = new ResizeObserver(() => {
-        // globe(3D)とmap(2D)の両方が存在する場合に対応
         if (globe) {
             const { width, height } = mapContainer.getBoundingClientRect();
             globe.width(width).height(height);
@@ -465,5 +631,4 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     resizeObserver.observe(mapContainer);
-
 });
