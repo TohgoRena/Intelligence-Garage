@@ -277,7 +277,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         const polyline = L.polyline(latlngs, { color: color, weight: 1.5, opacity: 0.6 }).addTo(map);
                         const eventName = (cameoCodes[event.eventCode]) ? cameoCodes[event.eventCode].name_ja : '詳細不明';
                         const rootEventName = (cameoCodes[event.eventRootCode]) ? cameoCodes[event.eventRootCode].name_ja : '不明なカテゴリ';
-                        const popupContent = `<b>関係:</b> ${countryCoordinates[actor1Code]?.name_jp} → ${countryCoordinates[actor2Code]?.name_jp}<br><b>カテゴリ:</b> ${rootEventName} (${event.eventRootCode})<br><b>イベント詳細:</b> ${eventName}`;
+                        const ac1 = (event.actor1.name || '') + (countryCoordinates[actor1Code] ? `(${countryCoordinates[actor1Code]?.name_jp})`: "");
+                        const ac2 = (event.actor2.name || '') + (countryCoordinates[actor2Code] ? `(${countryCoordinates[actor2Code]?.name_jp})`: "");
+                        const popupContent = `<b>関係:</b> ${ac1} → ${ac2}<br><b>カテゴリ:</b> ${rootEventName} (${event.eventRootCode})<br><b>イベント詳細:</b> ${eventName}`;
                         polyline.bindPopup(popupContent);
                         // ★ ADDED: Click listener for 2D polyline
                         polyline.on('click', () => focusOnTableRow(index));
@@ -497,20 +499,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (columns.length < 61) continue;
             
             const eventCode = columns[26];
+            const cc1 = columns[5] ? columns[5].substring(0, 3): null;
+            const cc2 = columns[15] ? columns[15].substring(0, 3): null;
+            console.log(cc1);
+            console.log(cc2);
             events.push({
                 actor1: { 
                     code: columns[5], 
                     name: columns[6], 
-                    countryCode: columns[7],
-                    lat: parseFloat(columns[38]), 
-                    lng: parseFloat(columns[39])
+                    countryCode: cc1,
+                    lat: columns[5] ? countryCoordinates[cc1]?.lat: null, 
+                    lng: columns[5] ? countryCoordinates[cc1]?.lng: null
                 },
                 actor2: { 
                     code: columns[15], 
                     name: columns[16], 
-                    countryCode: columns[17],
-                    lat: parseFloat(columns[48]),
-                    lng: parseFloat(columns[49])
+                    countryCode: cc2,
+                    lat: columns[15] ? countryCoordinates[cc2]?.lat: null, 
+                    lng: columns[15] ? countryCoordinates[cc2]?.lng: null
                 },
                 eventCode: eventCode,
                 eventRootCode: eventCode ? eventCode.substring(0, 2) : null,
@@ -573,7 +579,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${alpha})`;
     }
     
-    // ★ CHANGED: Modified function to accept index and set a unique row ID
     function addNewsToTable(event, index) {
         const row = newsTableBody.insertRow();
         row.id = `event-row-${index}`; // Set unique ID for the row
