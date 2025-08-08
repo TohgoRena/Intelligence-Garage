@@ -297,10 +297,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     singleCountryAggregates[countryCode][rootCode].count++;
 
                     let lat, lng;
-                    if (!isNaN(event.actor1.lat) && !isNaN(event.actor1.lng)) {
+                    if (event.actor1.name) {
                         lat = event.actor1.lat;
                         lng = event.actor1.lng;
-                    } else if (!isNaN(event.actor2.lat) && !isNaN(event.actor2.lng)) {
+                    } else if (event.actor2.name) {
                         lat = event.actor2.lat;
                         lng = event.actor2.lng;
                     } else {
