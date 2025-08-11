@@ -6,9 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta property="og:url" content="https://tohgorena.github.io/Intelligence-Garage/main.html">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Intelligence-Garage｜世界情勢リアルタイム可視化サイト">
-  <meta property="og:description" content="Intelligence-Garageは世界情勢をリアルタイム可視化することで">
-  <meta property="og:site_name" content="クラスノヴィア">
+  <meta property="og:title" content="Intelligence-Garage｜リアルタイム情勢監視サイト">
+  <meta property="og:description" content="安全保障系Vtuberによるリアルタイム情勢監視サイト “Intelligence-Garage”">
   <meta property="og:image:secure_url" content="https://raw.githubusercontent.com/TohgoRena/Intelligence-Garage/refs/heads/main/%E3%82%B5%E3%83%A0%E3%83%8D%E3%82%A4%E3%83%AB.png">
   <meta property="og:image:type" content="image/png" />
   <title>Intelligence Garage</title>
@@ -62,30 +61,39 @@
   <div id="modal-overlay" class="modal-overlay">
     <div id="info-modal" class="modal">
       <button id="close-modal" class="close-button">&times;</button>
-      <h2>このサイトについて</h2>
+      <h2>マニュアル</h2>
       
-      <h3><span class="material-symbols-outlined">description</span> サイトの目的</h3>
-      <p>このサイトは、世界情勢をリアルタイムで可視化することにより、自国や他国に興味を持つようになることを目的としています。</p>
+      <h3><span class="material-symbols-outlined">description</span> 目的</h3>
+      <p>同志諸君。</p>
+      <p>このサイトは、<strong>国際政治学や地政学の視座から、外交や政治の流れを読み解こうとする者たち</strong>のためにある。
+        混迷を深める<strong>世界情勢の背後にある力学</strong>を、冷静に、しかし確かに掴み取ってほしい。</p>
       
-      <h3><span class="material-symbols-outlined">gesture</span> 使い方</h3>
+      <h3><span class="material-symbols-outlined">gesture</span> 操作要綱</h3>
       <ul>
-        <li><strong>表示切替:</strong> 右上の「3D Globe / 2D Map」ボタンで、表示モードを切り替えられます。</li>
-        <li><strong>国フォーカス:</strong> 左側のサイドバーから国名をクリックすると、その国に視点が移動します。</li>
-        <li><strong>イベント詳細:</strong>
+        <li><strong>表示モード切替:</strong> 右上のボタンで、全球俯瞰と平面地図の表示を切り替える。</li>
+        <li><strong>対象国の選択:</strong> サイドバーから国家を選択すると、視点が対象国へ移行する。</li>
+        <li><strong>イベントの分析（マップ→一覧）:</strong>
           <ul>
-              <li>マップ上の線（2国間イベント）や点（単一国イベント）をクリックすると、下のテーブルの該当行がハイライトされます。</li>
-              <li>線や点をホバーすると、イベントの概要が表示されます。</li>
+              <li>マップ上のマーカー（線：二国間イベント、点：単一国家イベント）をクリックすると、下部データ一覧の該当行が明示される。</li>
+              <li>マーカーにカーソルを合わせる（ホバー）と、イベントの概要が簡易表示される。</li>
           </ul>
         </li>
-        <li><strong>テーブル連携:</strong> テーブルの各行は、マップ上のイベントと連動しています。</li>
-        <li><strong>凡例:</strong> マップ右上の凡例で、イベントの種類と色の対応を確認できます。凡例はクリックで開閉できます。</li>
+        <li><strong>イベントの特定（一覧→マップ）:</strong> 下部のデータ一覧から行を選択すると、マップ上の該当するイベントへ視点が移動する。</li>
+        <li><strong>凡例の活用:</strong> マップ右上の凡例で、イベント種別と色分けの対応を確認できる。凡例はクリックによる開閉が可能である。</li>
       </ul>
   
-      <h3><span class="material-symbols-outlined">warning</span> 注意事項</h3>
+      <h3><span class="material-symbols-outlined">warning</span> 留意事項</h3>
       <ul>
-        <li>GDELTプロジェクトから15分ごとに自動更新される最新のデータ（<a href="https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/" target="_blank" rel="noopener noreferrer">Last 15 Minutes CSV Data File List – GDELT Translingual.</a>）を取得して使用していますが、<strong>情報の完全性や正確性を保証するものではありません</strong>。</li>
-        <li>イベントの場所や関係者は機械的に抽出されているため、<strong>誤りが含まれる可能性</strong>があります。この可視化は<strong>参考程度</strong>に留め、参照先を<strong>必ず読むようにしてください</strong>。</li>
-        <li>詳細は、各イベントの「参照」列にある「記事を読む」リンクから元のニュースソースをご確認ください。参照先の記事が信用できるかどうかは<strong>ご自身で判断してください</strong>。</li>
+        <li>本サイトでは、GDELTプロジェクトから15分ごとに自動更新される最新データ（<a href="https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/" target="_blank" rel="noopener noreferrer">Last 15 Minutes CSV Data File List – GDELT Translingual.</a>）を用いているが、<strong>その情報の完全性や正確性を保証するものではない</strong>。</li>
+        <li><strong>必ず</strong>「参照」列にある「記事を読む」リンクから元のニュースソースを確認し、その信頼性を<strong>諸君自身の目で</strong>判断してほしい。</li>
+      </ul>
+
+      <h3 style="text-align: right;">
+        担当官
+      </h3>
+      <ul style="text-align: right;">
+        <lr>統括: <a href="https://x.com/TohgoRena" target="_blank" rel="noopener noreferrer">東郷レナ</a></lr>
+        <lr>技術開発: <a href="https://github.com/Shinh0707" target="_blank" rel="noopener noreferrer">Shinh0707</a></lr>
       </ul>
     </div>
   </div>
