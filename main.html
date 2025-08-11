@@ -7,16 +7,21 @@
   <title>Intelligence Garage</title>
   <link rel="icon" href="fury-black1.webp">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body class="dark">
   <div class="header">
     <h1>Intelligence Garage</h1>
+    
     <div class="view-toggle">
+      <div class="info"><span class="material-symbols-outlined">help</span></div>
+      <div>
       <button id="toggle-3d" class="active">3D Globe</button>
       <button id="toggle-2d">2D Map</button>
+      </div>
     </div>
   </div>
 
@@ -37,7 +42,7 @@
               <th>関係</th>
               <th>概要</th>
               <th>イベント種別</th>
-              <th>引用元記事</th>
+              <th>参照</th>
             </tr>
           </thead>
           <tbody id="news-table-body">
@@ -47,6 +52,36 @@
     </div>
   </div>
 
+  <div id="modal-overlay" class="modal-overlay">
+    <div id="info-modal" class="modal">
+      <button id="close-modal" class="close-button">&times;</button>
+      <h2>このサイトについて</h2>
+      
+      <h3><span class="material-symbols-outlined">description</span> サイトの目的</h3>
+      <p>このサイトは、世界情勢をリアルタイムで可視化することにより、自国や他国に興味を持つようになることを目的としています。</p>
+      
+      <h3><span class="material-symbols-outlined">gesture</span> 使い方</h3>
+      <ul>
+        <li><strong>表示切替:</strong> 右上の「3D Globe / 2D Map」ボタンで、表示モードを切り替えられます。</li>
+        <li><strong>国フォーカス:</strong> 左側のサイドバーから国名をクリックすると、その国に視点が移動します。</li>
+        <li><strong>イベント詳細:</strong>
+          <ul>
+              <li>マップ上の線（2国間イベント）や点（単一国イベント）をクリックすると、下のテーブルの該当行がハイライトされます。</li>
+              <li>線や点をホバーすると、イベントの概要が表示されます。</li>
+          </ul>
+        </li>
+        <li><strong>テーブル連携:</strong> テーブルの各行は、マップ上のイベントと連動しています。</li>
+        <li><strong>凡例:</strong> マップ右上の凡例で、イベントの種類と色の対応を確認できます。凡例はクリックで開閉できます。</li>
+      </ul>
+  
+      <h3><span class="material-symbols-outlined">warning</span> 注意事項</h3>
+      <ul>
+        <li>GDELTプロジェクトから15分ごとに自動更新される最新のデータ（<a href="https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/" target="_blank" rel="noopener noreferrer">Last 15 Minutes CSV Data File List – GDELT Translingual.</a>）を取得して使用していますが、情報の完全性や正確性を保証するものではありません。</li>
+        <li>イベントの場所や関係者は機械的に抽出されているため、誤りが含まれる可能性があります。</li>
+        <li>詳細は、各イベントの「参照」列にある「記事を読む」リンクから元のニュースソースをご確認ください。参照先の記事が信用できるかどうかはご自身で判断してください。</li>
+      </ul>
+    </div>
+  </div>
   <script src="https://unpkg.com/three"></script>
   <script src="https://unpkg.com/globe.gl"></script>
 

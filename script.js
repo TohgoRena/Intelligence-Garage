@@ -1,41 +1,53 @@
-/**
- * GDELTデータ可視化 統合スクリプト (3D Globe / 2D Map 切り替え対応版)
- *
- * GDELTから最新イベントデータを取得し、3D地球儀 (globe.gl) または
- * 2D地図 (Leaflet.js) 上に関係性を表示します。
- * ユーザーはUIを通じて表示モードを切り替えることができます。
- *
- * --- 主な機能 ---
- * - 3D (globe.gl) と 2D (Leaflet.js) の表示モード切替機能。
- * - GDELTの最新データを一度だけ取得し、表示切替時に再利用。
- * - ★線の色はイベントのルートカテゴリ(eventRootCode)に、テーブル行の背景はイベントの性質(GoldsteinScale)に連動。
- * - ★2国間以外のイベントは、国ごとにイベント種別で集計し、ポイントとして地図上に表示。
- * - ★マップ/地球儀の要素をクリックすると、対応するテーブル項目にフォーカスする機能を追加。
- * - CAMEOコードを日本語に変換して表示。
- * - サイドバーから国を選択すると、地図/地球儀がその国にフォーカス。
- * - 3Dモードでは国境線のハイライト機能も提供。
- * - リサイズ検知機能を追加し、表示崩れを防止。
- */
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- グローバル変数 ---
+
     const newsTableBody = document.getElementById('news-table-body');
     const mapContainer = document.getElementById('map');
     const PROXY_URL = 'https://corsproxy.io/?';
 
-    let globe = null; // 3D Globe instance
-    let map = null;   // 2D Map instance
+    let globe = null;
+    let map = null;
 
-    // 描画オブジェクトを管理する配列
-    let polylines = []; // 2Dマップの線
-    let singleCountryMarkers = []; // 2Dマップの単一国イベントマーカー
+
+    let polylines = [];
+    let singleCountryMarkers = [];
 
     let cameoCodes = {};
     let countryCoordinates = {};
     let allEvents = [];
     let allCountryFeatures = [];
     let highlightedPolygon = null;
-    let highlightedRow = null; // ★ ADDED: ハイライトされている行を追跡
+    let highlightedRow = null;
+
+    function setupModal() {
+        const infoIcon = document.querySelector('.view-toggle .info');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const closeModalButton = document.getElementById('close-modal');
+
+        if (infoIcon && modalOverlay && closeModalButton) {
+
+            infoIcon.addEventListener('click', () => {
+                modalOverlay.classList.add('modal-visible');
+            });
+
+
+            closeModalButton.addEventListener('click', () => {
+                modalOverlay.classList.remove('modal-visible');
+            });
+
+
+            modalOverlay.addEventListener('click', (event) => {
+
+                if (event.target === modalOverlay) {
+                    modalOverlay.classList.remove('modal-visible');
+                }
+            });
+        }
+    }
+    /**
+     *  END: ADDED FOR MODAL CONTROL 
+     */
+
 
     /**
      * ========================================
@@ -44,21 +56,19 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     async function main() {
         setupToggleButtons();
+        setupModal();
         await fetchDataAndProcess();
-        renderRegions(); // サイドバーを生成
+        renderRegions();
         setupCountryClickListeners();
         setupLegends();
     }
 
-    /**
-     * GDELTデータの取得と解析を行う
-     */
     async function fetchDataAndProcess() {
         console.log('処理を開始します...');
         newsTableBody.innerHTML = '<tr><td colspan="5">最新のイベントデータを読み込んでいます...</td></tr>';
 
         try {
-            // 補助ファイルの読み込み
+
             console.log('0/5: CAMEOコードと国座標データを読み込み中...');
             const [cameoResponse, countryCodeResponse, countriesRes] = await Promise.all([
                 fetch('cameo-event-codes.json'),
@@ -74,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const countriesData = await countriesRes.json();
             allCountryFeatures = countriesData.features;
 
-            // GDELTデータの取得
+
             console.log('1/5: 更新情報ファイルを取得中...');
             const updateInfoUrl = 'http://data.gdeltproject.org/gdeltv2/lastupdate-translation.txt';
             const response = await fetch(PROXY_URL + encodeURIComponent(updateInfoUrl));
@@ -99,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('4/5: データを解析して表示準備...');
             allEvents = parseGdeltCsv(csvContent);
 
-            // 初期表示（3D）
+
             console.log("set globe");
             init3D();
             console.log("end set globe");
@@ -110,11 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * ========================================
-     * 表示モード切替
-     * ========================================
-     */
     function setupToggleButtons() {
         const btn3d = document.getElementById('toggle-3d');
         const btn2d = document.getElementById('toggle-2d');
@@ -154,12 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
         init2D();
     }
 
-
-    /**
-     * ========================================
-     * 3D Globe (globe.gl) 関連
-     * ========================================
-     */
     function init3D() {
         const { width, height } = mapContainer.getBoundingClientRect();
         globe = Globe()(mapContainer)
@@ -196,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .arcStroke(0.4)
             .arcDashLength(0.5)
             .arcDashGap(0.2)
-            // ★ ADDED: Click handlers for globe elements
+
             .onArcClick(arc => {
                 if (arc.index !== undefined) {
                     focusOnTableRow(arc.index);
@@ -209,14 +208,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
         globe.pointOfView({ altitude: 3.5 }, 1000);
-        renderDataOnMap(); // データを描画
+        renderDataOnMap();
     }
 
-    /**
-     * ========================================
-     * 2D Map (Leaflet) 関連
-     * ========================================
-     */
     function init2D() {
         map = L.map('map', { worldCopyJump: true }).setView([20, 0], 2);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -224,16 +218,11 @@ document.addEventListener('DOMContentLoaded', () => {
             subdomains: 'abcd',
             maxZoom: 19
         }).addTo(map);
-        renderDataOnMap(); // データを描画
+        renderDataOnMap();
     }
 
-    /**
-     * ========================================
-     * データ描画と更新 (共通)
-     * ========================================
-     */
     function renderDataOnMap() {
-        // --- 1. 既存の描画をクリア ---
+
         newsTableBody.innerHTML = '';
         if (map) {
             polylines.forEach(p => p.remove());
@@ -245,22 +234,22 @@ document.addEventListener('DOMContentLoaded', () => {
         let bilateralEventCount = 0;
         let singleCountryEventCount = 0;
 
-        // --- 2. データ構造を準備 ---
+
         const arcData3D = [];
         const pointsData3D = [];
         const singleCountryAggregates = {};
         const posCounts = {};
 
-        // --- 3. 全てのイベントをループ処理 ---
-        // ★ CHANGED: Add index to the loop
+
+
         allEvents.forEach((event, index) => {
-            // ★ CHANGED: Pass index to the table function
+
             addNewsToTable(event, index);
 
             const actor1Code = event.actor1.countryCode;
             const actor2Code = event.actor2.countryCode;
 
-            // --- A. 2国間イベント ---
+
             if (actor1Code && actor2Code && actor1Code !== actor2Code) {
                 const startCoords = countryCoordinates[actor1Code];
                 const endCoords = countryCoordinates[actor2Code];
@@ -268,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (startCoords && endCoords) {
                     bilateralEventCount++;
                     if (globe) {
-                        // ★ CHANGED: Add index to arc data
+
                         arcData3D.push({ startLat: startCoords.lat, startLng: startCoords.lng, endLat: endCoords.lat, endLng: endCoords.lng, event: event, index: index });
                     }
                     if (map) {
@@ -281,13 +270,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         const ac2 = (event.actor2.name || '') + (countryCoordinates[actor2Code] ? `(${countryCoordinates[actor2Code]?.name_jp})`: "");
                         const popupContent = `<b>関係:</b> ${ac1} → ${ac2}<br><b>カテゴリ:</b> ${rootEventName} (${event.eventRootCode})<br><b>イベント詳細:</b> ${eventName}`;
                         polyline.bindPopup(popupContent);
-                        // ★ ADDED: Click listener for 2D polyline
+
                         polyline.on('click', () => focusOnTableRow(index));
                         polylines.push(polyline);
                     }
                 }
             }
-            // --- B. 単一国イベント ---
+
             else {
                 const countryCode = event.actor1.countryCode || event.actor2.countryCode;
                 const rootCode = event.eventRootCode;
@@ -322,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const labelContent = `<b>国:</b> ${countryName}<br><b>イベント:</b> ${eventName} (${event.eventCode})`;
 
                     if (globe) {
-                        // ★ CHANGED: Add index to point data
+
                         pointsData3D.push({
                             lat: lat + Math.sin(posCounts[lat][lng]) * (0.2 * posCounts[lat][lng] / 3),
                             lng: lng + Math.cos(posCounts[lat][lng]) * (0.4 * posCounts[lat][lng] / 3),
@@ -347,7 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             fillOpacity: 0.8
                         }).addTo(map);
                         circle.bindPopup(labelContent);
-                        // ★ ADDED: Click listener for 2D circle marker
                         circle.on('click', () => focusOnTableRow(index));
                         singleCountryMarkers.push(circle);
                     }
@@ -378,29 +366,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
-    /**
-     * ========================================
-     * サイドバーとインタラクション
-     * ========================================
-     */
-
-    // ★ ADDED: Function to focus and highlight a table row
     function focusOnTableRow(index) {
         const rowId = `event-row-${index}`;
         const row = document.getElementById(rowId);
 
         if (row) {
-            // Remove highlight from the previously selected row
+
             if (highlightedRow) {
                 highlightedRow.classList.remove('highlighted');
             }
 
-            // Add highlight to the new row
-            row.classList.add('highlighted');
-            highlightedRow = row; // Track the new highlighted row
 
-            // Scroll to the row
+            row.classList.add('highlighted');
+            highlightedRow = row;
+
+
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
@@ -427,8 +407,10 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.entries(regions).forEach(([region, countries]) => {
             const regionDiv = document.createElement("div");
             regionDiv.className = "region";
-            regionDiv.textContent = region;
-            regionDiv.onclick = () => toggleRegion(region);
+            const regionLabel = document.createElement("button");
+            regionLabel.textContent = region;
+            regionLabel.onclick = () => toggleRegion(region);
+            regionDiv.appendChild(regionLabel);
             container.appendChild(regionDiv);
 
             if (selectedRegion === region) {
@@ -440,9 +422,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     li.textContent = country;
                     ul.appendChild(li);
                 });
-                container.appendChild(ul);
+                regionDiv.appendChild(ul);
             }
-            container.appendChild(document.createElement("hr"));
         });
     }
 
@@ -476,20 +457,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const coords = countryCoordinates[countryCode];
         if (!coords) return;
 
-        if (globe) { // 3D
+        if (globe) {
             globe.pointOfView({ lat: coords.lat, lng: coords.lng, altitude: 1.5 }, 1000);
         }
-        if (map) { // 2D
+        if (map) {
             map.setView([coords.lat, coords.lng], 5);
         }
     }
-
-
-    /**
-     * ========================================
-     * ヘルパー関数
-     * ========================================
-     */
 
     function parseGdeltCsv(csvContent) {
         const events = [];
@@ -501,8 +475,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const eventCode = columns[26];
             const cc1 = columns[5] ? columns[5].substring(0, 3): null;
             const cc2 = columns[15] ? columns[15].substring(0, 3): null;
-            console.log(cc1);
-            console.log(cc2);
+
+
             events.push({
                 actor1: { 
                     code: columns[5], 
@@ -569,10 +543,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isNaN(score)) return 'transparent';
         const alpha = 0.12;
         let r, g, b;
-        if (score >= 0) { // 協力 (青系)
+        if (score >= 0) {
             const factor = Math.min(score, 10) / 10.0;
             r = 230 - 30 * factor; g = 230 + 25 * factor; b = 255;
-        } else { // 紛争 (赤系)
+        } else {
             const factor = Math.abs(score) / 10.0;
             r = 255; g = 230 - 30 * factor; b = 230 - 30 * factor;
         }
@@ -581,7 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function addNewsToTable(event, index) {
         const row = newsTableBody.insertRow();
-        row.id = `event-row-${index}`; // Set unique ID for the row
+        row.id = `event-row-${index}`;
         row.style.backgroundColor = getGoldsteinBackgroundColor(event.goldsteinScale);
 
         const date = event.day;
@@ -623,9 +597,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 処理の実行 ---
     main();
-    // --- リサイズ処理 ---
+
     const resizeObserver = new ResizeObserver(() => {
         if (globe) {
             const { width, height } = mapContainer.getBoundingClientRect();
