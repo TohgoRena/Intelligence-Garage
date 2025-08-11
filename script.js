@@ -345,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         pointsData3D.push({
                             lat: lat + Math.sin(posCounts[lat][lng]) * (0.2 * posCounts[lat][lng] / 3),
                             lng: lng + Math.cos(posCounts[lat][lng]) * (0.4 * posCounts[lat][lng] / 3),
-                            size: 0.2,
+                            size: 0.25,
                             color: color,
                             label: labelContent,
                             countryName: "",
@@ -356,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     if (map) {
-                        const radius = 5;
+                        const radius = 10;
                         const circle = L.circleMarker([lat, lng], {
                             radius: radius,
                             fillColor: color,
@@ -497,24 +497,25 @@ document.addEventListener('DOMContentLoaded', () => {
             if (columns.length < 61) continue;
             
             const eventCode = columns[26];
-            const cc1 = columns[5] ? columns[5].substring(0, 3): null;
-            const cc2 = columns[15] ? columns[15].substring(0, 3): null;
-
+            const cc1 = columns[5] ? columns[5].substring(0, 3): (columns[15] ? columns[15].substring(0, 3): null);
+            const cc2 = columns[15] ? columns[15].substring(0, 3): cc1;
+            const ccd1 = countryCoordinates[cc1];
+            const ccd2 = countryCoordinates[cc2];
             events.push({
                 actor1: { 
                     code: columns[5], 
                     name: columns[6].length > 0 ? columns[6] : null, 
                     countryCode: cc1,
-                    lat: cc1 ? countryCoordinates[cc1]?.lat: null, 
-                    lng: cc1 ? countryCoordinates[cc1]?.lng: null,
+                    lat: ccd1 ? ccd1.lat: (ccd2 ? ccd2.lat : null), 
+                    lng: ccd1 ? ccd1.lng: (ccd2 ? ccd2.lng : null),
                     isplace: (countryCoordinates[cc1]?.lat && countryCoordinates[cc1]?.lng) ? true : false
                 },
                 actor2: { 
                     code: columns[15], 
                     name: columns[16].length > 0 ? columns[16] : null, 
                     countryCode: cc2,
-                    lat: cc2 ? countryCoordinates[cc2]?.lat: null, 
-                    lng: cc2 ? countryCoordinates[cc2]?.lng: null,
+                    lat: ccd2 ? ccd2.lat: (ccd1 ? ccd1.lat: null), 
+                    lng: ccd2 ? ccd2.lng: (ccd1 ? ccd1.lng: null),
                     isplace: (countryCoordinates[cc2]?.lat && countryCoordinates[cc2]?.lng) ? true : false
                 },
                 eventCode: eventCode,
@@ -599,11 +600,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (map) {
             if (ac1 && ac2){
                 map.setView([
-                    (event.actor1.lat+event.actor2.lat)/2, (event.actor1.lng+event.actor2.lng)/2], same? 2 : 4);
+                    (event.actor1.lat+event.actor2.lat)/2, (event.actor1.lng+event.actor2.lng)/2], same? 8 : 5);
             }else{
                 const lat = ac1 ? event.actor1.lat : event.actor2.lat;
                 const lng = ac1 ? event.actor1.lng : event.actor2.lng;
-                map.setView([lat, lng], 2);
+                map.setView([lat, lng], 8);
             }
         }
         focusOnTableRow(index);
