@@ -1,13 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-
     const newsTableBody = document.getElementById('news-table-body');
     const mapContainer = document.getElementById('map');
     const PROXY_URL = 'https://corsproxy.io/?';
 
     let globe = null;
     let map = null;
-
 
     let polylines = [];
     let singleCountryMarkers = [];
@@ -18,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let allCountryFeatures = [];
     let highlightedPolygon = null;
     let highlightedRow = null;
+    let updateTimer = null;
+    let nextUpdateTime = null;
 
     function setupModal() {
         const infoIcon = document.querySelector('.view-toggle .info');
@@ -25,35 +25,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const closeModalButton = document.getElementById('close-modal');
 
         if (infoIcon && modalOverlay && closeModalButton) {
-
             infoIcon.addEventListener('click', () => {
                 modalOverlay.classList.add('modal-visible');
             });
-
 
             closeModalButton.addEventListener('click', () => {
                 modalOverlay.classList.remove('modal-visible');
             });
 
-
             modalOverlay.addEventListener('click', (event) => {
-
                 if (event.target === modalOverlay) {
                     modalOverlay.classList.remove('modal-visible');
                 }
             });
         }
     }
-    /**
-     *  END: ADDED FOR MODAL CONTROL 
-     */
-
-
-    /**
-     * ========================================
-     * 初期化とメイン処理
-     * ========================================
-     */
+    
     async function main() {
         setupToggleButtons();
         setupModal();
@@ -68,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
         newsTableBody.innerHTML = '<tr><td colspan="5">最新のイベントデータを読み込んでいます...</td></tr>';
 
         try {
-
             console.log('0/5: CAMEOコードと国座標データを読み込み中...');
             const [cameoResponse, countryCodeResponse, countriesRes] = await Promise.all([
                 fetch('cameo-event-codes.json'),
@@ -84,7 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const countriesData = await countriesRes.json();
             allCountryFeatures = countriesData.features;
 
-
             console.log('1/5: 更新情報ファイルを取得中...');
             const updateInfoUrl = 'http://data.gdeltproject.org/gdeltv2/lastupdate-translation.txt';
             const response = await fetch(PROXY_URL + encodeURIComponent(updateInfoUrl));
@@ -94,6 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const zipUrlMatch = textData.match(/http:\/\/data\.gdeltproject\.org\/gdeltv2\/\d+\.translation\.export\.CSV\.zip/);
             if (!zipUrlMatch) throw new Error('更新情報ファイル内に有効なZIP URLが見つかりませんでした。');
             const zipUrl = zipUrlMatch[0];
+            
+            scheduleNextUpdate(zipUrl);
 
             console.log('2/5: ZIPファイルをダウンロード中...');
             const zipResponse = await fetch(PROXY_URL + encodeURIComponent(zipUrl));
@@ -109,15 +96,69 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('4/5: データを解析して表示準備...');
             allEvents = parseGdeltCsv(csvContent);
 
-
-            console.log("set globe");
-            init3D();
-            console.log("end set globe");
-
+            // CHANGED: 3Dビューがアクティブな場合のみ初期化し、それ以外は2D/3Dデータを更新する
+            if (document.getElementById('toggle-3d').classList.contains('active')) {
+                if (!globe) {
+                    init3D();
+                } else {
+                    renderDataOnMap();
+                }
+            } else {
+                if (!map) {
+                    init2D();
+                } else {
+                    renderDataOnMap();
+                }
+            }
+            
         } catch (error) {
             console.error('エラーが発生しました:', error);
             newsTableBody.innerHTML = `<tr><td colspan="5" style="color: red;">エラー: ${error.message}</td></tr>`;
         }
+    }
+
+    function scheduleNextUpdate(zipUrl) {
+        if (updateTimer) {
+            clearTimeout(updateTimer);
+        }
+    
+        const timestampMatch = zipUrl.match(/(\d{14})\.translation\.export\.CSV\.zip/);
+        if (!timestampMatch) {
+            console.warn('ファイル名からタイムスタンプを抽出できませんでした。自動更新は行われません。');
+            return;
+        }
+        console.log(`get ${timestampMatch}`);
+    
+        const timestamp = timestampMatch[1];
+        const year = parseInt(timestamp.substring(0, 4), 10);
+        const month = parseInt(timestamp.substring(4, 6), 10) - 1;
+        const day = parseInt(timestamp.substring(6, 8), 10);
+        const hours = parseInt(timestamp.substring(8, 10), 10);
+        const minutes = parseInt(timestamp.substring(10, 12), 10);
+        const seconds = parseInt(timestamp.substring(12, 14), 10);
+    
+        // 取得したデータの時刻 (UTC)
+        const fileDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
+        
+        // 次の更新時刻 (15分後) を設定
+        nextUpdateTime = new Date(fileDate.getTime() + 25 * 60 * 1000);
+    
+        const now = new Date();
+        // 更新時刻までの遅延時間 (ミリ秒) を計算。余裕をもって1秒追加
+        let delay = nextUpdateTime.getTime() - now.getTime() + 1000;
+    
+        if (delay < 0) {
+            // もし更新時刻を過ぎていたら、1分後に再試行
+            console.log('次の更新時刻を過ぎています。1分後にデータ更新を再試行します。');
+            delay = 60 * 1000; 
+        }
+    
+        console.log(`次のデータ更新は ${nextUpdateTime.toLocaleString()} ごろに予定されています。(約${Math.round(delay / 60000)}分後)`);
+    
+        updateTimer = setTimeout(() => {
+            console.log('スケジュールされたデータ更新を開始します...');
+            fetchDataAndProcess();
+        }, delay);
     }
 
     function setupToggleButtons() {
@@ -195,7 +236,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .arcStroke(0.4)
             .arcDashLength(0.5)
             .arcDashGap(0.2)
-
             .onArcClick(arc => {
                 if (arc.index !== undefined) {
                     focusOnTableRow(arc.index);
@@ -220,9 +260,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }).addTo(map);
         renderDataOnMap();
     }
-
+    
     function renderDataOnMap() {
-
         newsTableBody.innerHTML = '';
         if (map) {
             polylines.forEach(p => p.remove());
@@ -234,21 +273,16 @@ document.addEventListener('DOMContentLoaded', () => {
         let bilateralEventCount = 0;
         let singleCountryEventCount = 0;
 
-
         const arcData3D = [];
         const pointsData3D = [];
         const singleCountryAggregates = {};
         const posCounts = {};
 
-
-
         allEvents.forEach((event, index) => {
-
             addNewsToTable(event, index);
 
             const actor1Code = event.actor1.countryCode;
             const actor2Code = event.actor2.countryCode;
-
 
             if (actor1Code && actor2Code && actor1Code !== actor2Code) {
                 const startCoords = countryCoordinates[actor1Code];
@@ -257,7 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (startCoords && endCoords) {
                     bilateralEventCount++;
                     if (globe) {
-
                         arcData3D.push({ startLat: startCoords.lat, startLng: startCoords.lng, endLat: endCoords.lat, endLng: endCoords.lng, event: event, index: index });
                     }
                     if (map) {
@@ -275,9 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         polylines.push(polyline);
                     }
                 }
-            }
-
-            else {
+            } else {
                 const countryCode = event.actor1.countryCode || event.actor2.countryCode;
                 const rootCode = event.eventRootCode;
                 if (countryCode && rootCode && countryCoordinates[countryCode]) {
@@ -288,10 +319,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     singleCountryAggregates[countryCode][rootCode].count++;
 
                     let lat, lng;
-                    if (event.actor1.name) {
+                    if (event.actor1.isplace) {
                         lat = event.actor1.lat;
                         lng = event.actor1.lng;
-                    } else if (event.actor2.name) {
+                    } else if (event.actor2.isplace) {
                         lat = event.actor2.lat;
                         lng = event.actor2.lng;
                     } else {
@@ -311,7 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const labelContent = `<b>国:</b> ${countryName}<br><b>イベント:</b> ${eventName} (${event.eventCode})`;
 
                     if (globe) {
-
                         pointsData3D.push({
                             lat: lat + Math.sin(posCounts[lat][lng]) * (0.2 * posCounts[lat][lng] / 3),
                             lng: lng + Math.cos(posCounts[lat][lng]) * (0.4 * posCounts[lat][lng] / 3),
@@ -369,18 +399,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function focusOnTableRow(index) {
         const rowId = `event-row-${index}`;
         const row = document.getElementById(rowId);
-
         if (row) {
-
             if (highlightedRow) {
                 highlightedRow.classList.remove('highlighted');
             }
-
-
             row.classList.add('highlighted');
             highlightedRow = row;
-
-
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
@@ -476,21 +500,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const cc1 = columns[5] ? columns[5].substring(0, 3): null;
             const cc2 = columns[15] ? columns[15].substring(0, 3): null;
 
-
             events.push({
                 actor1: { 
                     code: columns[5], 
-                    name: columns[6], 
+                    name: columns[6].length > 0 ? columns[6] : null, 
                     countryCode: cc1,
-                    lat: columns[5] ? countryCoordinates[cc1]?.lat: null, 
-                    lng: columns[5] ? countryCoordinates[cc1]?.lng: null
+                    lat: cc1 ? countryCoordinates[cc1]?.lat: null, 
+                    lng: cc1 ? countryCoordinates[cc1]?.lng: null,
+                    isplace: (countryCoordinates[cc1]?.lat && countryCoordinates[cc1]?.lng) ? true : false
                 },
                 actor2: { 
                     code: columns[15], 
-                    name: columns[16], 
+                    name: columns[16].length > 0 ? columns[16] : null, 
                     countryCode: cc2,
-                    lat: columns[15] ? countryCoordinates[cc2]?.lat: null, 
-                    lng: columns[15] ? countryCoordinates[cc2]?.lng: null
+                    lat: cc2 ? countryCoordinates[cc2]?.lat: null, 
+                    lng: cc2 ? countryCoordinates[cc2]?.lng: null,
+                    isplace: (countryCoordinates[cc2]?.lat && countryCoordinates[cc2]?.lng) ? true : false
                 },
                 eventCode: eventCode,
                 eventRootCode: eventCode ? eventCode.substring(0, 2) : null,
@@ -552,12 +577,89 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${alpha})`;
     }
+
+    function handleOnClick(event,index,ac1,ac2,same){
+        console.log(event);
+        console.log(ac1 && ac2);
+        if (globe) {
+            if (ac1 && ac2){
+                globe.pointOfView(getMidpoint(
+                    event.actor1.lat,
+                    event.actor1.lng,
+                    event.actor2.lat,
+                    event.actor2.lng,
+                    same ? 0.2 : 1
+                ), 1000);
+            }else{
+                const lat = ac1 ? event.actor1.lat : event.actor2.lat;
+                const lng = ac1 ? event.actor1.lng : event.actor2.lng;
+                globe.pointOfView({ lat: lat, lng: lng, altitude: 0.2 }, 1000);
+            }
+        }
+        if (map) {
+            if (ac1 && ac2){
+                map.setView([
+                    (event.actor1.lat+event.actor2.lat)/2, (event.actor1.lng+event.actor2.lng)/2], same? 2 : 4);
+            }else{
+                const lat = ac1 ? event.actor1.lat : event.actor2.lat;
+                const lng = ac1 ? event.actor1.lng : event.actor2.lng;
+                map.setView([lat, lng], 2);
+            }
+        }
+        focusOnTableRow(index);
+    }
+
+    function getMidpoint(lat1, lng1, lat2, lng2, alt) {
+        // 度をラジアンに変換
+        const toRadians = (degree) => degree * Math.PI / 180;
+        const toDegrees = (radian) => radian * 180 / Math.PI;
+
+        const lat1Rad = toRadians(lat1);
+        const lng1Rad = toRadians(lng1);
+        const lat2Rad = toRadians(lat2);
+        const lng2Rad = toRadians(lng2);
+
+        const Bx = Math.cos(lat2Rad) * Math.cos(lng2Rad - lng1Rad);
+        const By = Math.cos(lat2Rad) * Math.sin(lng2Rad - lng1Rad);
+
+        const latMidRad = Math.atan2(
+            Math.sin(lat1Rad) + Math.sin(lat2Rad),
+            Math.sqrt((Math.cos(lat1Rad) + Bx) * (Math.cos(lat1Rad) + Bx) + By * By)
+        );
+        
+        const lngMidRad = lng1Rad + Math.atan2(By, Math.cos(lat1Rad) + Bx);
+
+        return {
+            lat: toDegrees(latMidRad),
+            lng: toDegrees(lngMidRad),
+            altitude: alt
+        };
+    }
     
     function addNewsToTable(event, index) {
+        if (!event.actor1.isplace && !event.actor2.isplace){
+            return;
+        }
+        const actor1Display = event.actor1.name;
+        const actor2Display = event.actor2.name;
+        let summary = '詳細不明';
+        if(actor1Display && actor2Display && 
+            (actor1Display !== actor2Display)) {
+            summary = `${actor1Display}が${actor2Display}に対し行動`;
+        } else if (actor1Display) {
+            summary = `${actor1Display}に関するイベント`;
+            if (!event.actor1.isplace){
+                return;
+            }
+        } else if (actor2Display) {
+            summary = `${actor2Display}に関するイベント`;
+            if (!event.actor2.isplace){
+                return;
+            }
+        }
         const row = newsTableBody.insertRow();
         row.id = `event-row-${index}`;
         row.style.backgroundColor = getGoldsteinBackgroundColor(event.goldsteinScale);
-
         const date = event.day;
         row.insertCell(0).textContent = date ? `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}` : '';
 
@@ -569,17 +671,19 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell(1).textContent = `${actor1Name || actor2Name}`;
         }
 
-        const actor1Display = event.actor1.name;
-        const actor2Display = event.actor2.name;
-        let summary = '詳細不明';
-        if(actor1Display && actor2Display && actor1Display !== actor2Display) {
-            summary = `${actor1Display}が${actor2Display}に対し行動`;
-        } else if (actor1Display) {
-            summary = `${actor1Display}に関するイベント`;
-        } else if (actor2Display) {
-            summary = `${actor2Display}に関するイベント`;
-        }
+        
         row.insertCell(2).textContent = summary;
+        if ((actor1Display != undefined) || (actor2Display != undefined)){
+            row.addEventListener('click', 
+                () => handleOnClick(
+                    event,
+                    index,
+                    event.actor1.isplace,
+                    event.actor2.isplace,
+                    actor1Display == actor2Display
+                )
+            );
+        }
 
         row.insertCell(3).textContent = (cameoCodes[event.eventCode]) ? cameoCodes[event.eventCode].name_ja : (event.eventCode || '');
 
