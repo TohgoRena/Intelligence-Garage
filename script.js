@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let polylines = [];
     let singleCountryMarkers = [];
+    let geojsonLayer = null;
+    let highlightedLayer2D = null;
 
     let cameoCodes = {};
     let countryCoordinates = {};
@@ -96,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('4/5: データを解析して表示準備...');
             allEvents = parseGdeltCsv(csvContent);
 
-            // CHANGED: 3Dビューがアクティブな場合のみ初期化し、それ以外は2D/3Dデータを更新する
             if (document.getElementById('toggle-3d').classList.contains('active')) {
                 if (!globe) {
                     init3D();
@@ -137,18 +138,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const minutes = parseInt(timestamp.substring(10, 12), 10);
         const seconds = parseInt(timestamp.substring(12, 14), 10);
     
-        // 取得したデータの時刻 (UTC)
         const fileDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
         
-        // 次の更新時刻 (15分後) を設定
         nextUpdateTime = new Date(fileDate.getTime() + 25 * 60 * 1000);
     
         const now = new Date();
-        // 更新時刻までの遅延時間 (ミリ秒) を計算。余裕をもって1秒追加
         let delay = nextUpdateTime.getTime() - now.getTime() + 1000;
     
         if (delay < 0) {
-            // もし更新時刻を過ぎていたら、1分後に再試行
             console.log('次の更新時刻を過ぎています。1分後にデータ更新を再試行します。');
             delay = 60 * 1000; 
         }
@@ -197,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
             globe = null;
         }
         mapContainer.innerHTML = '';
+        highlightedLayer2D = null;
         init2D();
     }
 
@@ -266,6 +264,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (map) {
             polylines.forEach(p => p.remove());
             singleCountryMarkers.forEach(m => m.remove());
+            if (geojsonLayer) {
+                geojsonLayer.remove();
+            }
         }
         polylines = [];
         singleCountryMarkers = [];
@@ -373,21 +374,44 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        const dominantEventColorMap = {};
+        for (const countryCode in singleCountryAggregates) {
+            const events = singleCountryAggregates[countryCode];
+            if (!events || Object.keys(events).length === 0) continue;
+            const dominantRootCode = Object.keys(events).reduce((a, b) => events[a].count > events[b].count ? a : b);
+            dominantEventColorMap[countryCode] = getEventRootCodeColor(dominantRootCode);
+        }
+        
         if (globe) {
-            const dominantEventColorMap = {};
-            for (const countryCode in singleCountryAggregates) {
-                const events = singleCountryAggregates[countryCode];
-                if (!events || Object.keys(events).length === 0) continue;
-                const dominantRootCode = Object.keys(events).reduce((a, b) => events[a].count > events[b].count ? a : b);
-                const color = getEventRootCodeColor(dominantRootCode);
-                dominantEventColorMap[countryCode] = color.replace(/, \d\.\d+\)/, ', 0.35)');
-            }
             globe.polygonCapColor(d => {
                 if (d === highlightedPolygon) return 'rgba(255, 255, 0, 0.5)';
-                return dominantEventColorMap[d.properties.ISO_A3] || 'rgba(200, 200, 200, 0.1)';
+                const color = dominantEventColorMap[d.properties.ISO_A3];
+                return color ? color.replace(/, \d\.\d+\)/, ', 0.35)') : 'rgba(200, 200, 200, 0.1)';
             });
             globe.arcsData(arcData3D);
             globe.labelsData(pointsData3D);
+        }
+
+        if (map) {
+            geojsonLayer = L.geoJson(allCountryFeatures, {
+                style: feature => {
+                    const isoCode = feature.properties.ISO_A3;
+                    const color = dominantEventColorMap[isoCode] || 'rgba(200, 200, 200, 0.1)';
+                    return {
+                        fillColor: color,
+                        weight: 1,
+                        color: '#ccc',
+                        opacity: 1
+                    };
+                },
+                onEachFeature: (feature, layer) => {
+                    layer.bindTooltip(`<b>${feature.properties.ADMIN} (${feature.properties.ISO_A3})</b>`);
+                    layer.on('click', () => {
+                        focusOnCountry(feature.properties.ISO_A3);
+                    });
+                }
+            }).addTo(map);
+            geojsonLayer.bringToBack();
         }
 
         console.log(`処理完了。2国間イベント: ${bilateralEventCount}件、単一国イベント: ${singleCountryEventCount}件を読み込みました。`);
@@ -468,8 +492,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         const targetFeature = allCountryFeatures.find(f => f.properties.ISO_A3 === isoCode);
                         if (targetFeature) {
                            highlightedPolygon = targetFeature;
-                           globe.polygonCapColor(d => d === highlightedPolygon ? 'rgba(255, 255, 0, 0.2)' : 'rgba(200, 200, 200, 0.1)');
-                           globe.polygonStrokeColor(d => d === highlightedPolygon ? 'yellow' : '#ccc');
+
+                           globe.polygonsData(allCountryFeatures);
                         }
                     }
                 }
@@ -486,6 +510,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (map) {
             map.setView([coords.lat, coords.lng], 5);
+
+            if (highlightedLayer2D) {
+                geojsonLayer.resetStyle(highlightedLayer2D);
+            }
+            highlightedLayer2D = null;
+            if (geojsonLayer) {
+                geojsonLayer.eachLayer(layer => {
+                    if (layer.feature.properties.ISO_A3 === countryCode) {
+                        highlightedLayer2D = layer;
+                        layer.setStyle({
+                            weight: 3,
+                            color: 'yellow'
+                        });
+                    }
+                });
+            }
         }
     }
 
@@ -611,7 +651,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getMidpoint(lat1, lng1, lat2, lng2, alt) {
-        // 度をラジアンに変換
         const toRadians = (degree) => degree * Math.PI / 180;
         const toDegrees = (radian) => radian * 180 / Math.PI;
 
