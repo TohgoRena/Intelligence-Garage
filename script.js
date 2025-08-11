@@ -356,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     if (map) {
-                        const radius = 10;
+                        const radius = 6;
                         const circle = L.circleMarker([lat, lng], {
                             radius: radius,
                             fillColor: color,
