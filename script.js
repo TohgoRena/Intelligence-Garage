@@ -52,110 +52,165 @@ document.addEventListener('DOMContentLoaded', () => {
         setupLegends();
     }
 
+    /**
+     * Service class for handling GDELT data operations.
+     * Manages fetching, caching, and parsing.
+     */
+    class GdeltDataService {
+        constructor() {
+            this.API_ENDPOINT = 'https://tohgorena-intelligence-garage.shinh-cfapps-ghsuw-tqo08264-n3k1.workers.dev/';
+            this.CACHE_KEYS = {
+                DATA: 'gdelt_csv_content',
+                FETCH_TIMESTAMP: 'gdelt_last_fetch_ms'
+            };
+            this.CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+        }
+
+        /**
+         * Orchestrates data retrieval.
+         * Checks cache validity first, then falls back to API.
+         * @returns {Promise<string>} The CSV content.
+         */
+        async getCsvData() {
+            if (this._isCacheValid()) {
+                console.info('[GdeltDataService] Cache hit. Using local data.');
+                return localStorage.getItem(this.CACHE_KEYS.DATA);
+            }
+
+            console.info('[GdeltDataService] Cache expired or missing. Fetching from API...');
+            return await this._fetchFromApi();
+        }
+
+        /**
+         * Checks if the local cache is present and within the TTL window.
+         * @private
+         * @returns {boolean}
+         */
+        _isCacheValid() {
+            const lastFetchStr = localStorage.getItem(this.CACHE_KEYS.FETCH_TIMESTAMP);
+            const data = localStorage.getItem(this.CACHE_KEYS.DATA);
+
+            if (!lastFetchStr || !data) return false;
+
+            const lastFetch = parseInt(lastFetchStr, 10);
+            const now = Date.now();
+
+            // Check if cache is within TTL
+            return (now - lastFetch) < this.CACHE_TTL_MS;
+        }
+
+        /**
+         * Fetches data from the worker, unzips it, and updates the cache.
+         * @private
+         * @returns {Promise<string>}
+         */
+        async _fetchFromApi() {
+            try {
+                const response = await fetch(this.API_ENDPOINT);
+                
+                if (!response.ok) {
+                    throw new Error(`API Request Failed. Status: ${response.status}`);
+                }
+
+                // Extract headers if needed for UI display (e.g., data generation time)
+                const generatedAt = response.headers.get("X-Gdelt-Generated-At");
+                
+                const arrayBuffer = await response.arrayBuffer();
+                const unzippedContent = await this._unzipData(arrayBuffer);
+
+                this._updateCache(unzippedContent);
+                
+                return unzippedContent;
+
+            } catch (error) {
+                console.error('[GdeltDataService] Fetch Error:', error);
+                throw error; // Propagate to caller
+            }
+        }
+
+        /**
+         * Unzips the response buffer.
+         * @private
+         * @param {ArrayBuffer} buffer 
+         * @returns {Promise<string>}
+         */
+        async _unzipData(buffer) {
+            const jszip = new JSZip();
+            const zip = await jszip.loadAsync(buffer);
+            const filename = Object.keys(zip.files)[0];
+            return await zip.file(filename).async('string');
+        }
+
+        /**
+         * Updates localStorage with new data and current timestamp.
+         * @private
+         * @param {string} content 
+         */
+        _updateCache(content) {
+            try {
+                localStorage.setItem(this.CACHE_KEYS.DATA, content);
+                localStorage.setItem(this.CACHE_KEYS.FETCH_TIMESTAMP, Date.now().toString());
+            } catch (e) {
+                console.warn('[GdeltDataService] Storage Quota Exceeded. Cache disabled for this session.');
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // Integration with existing procedural code
+    // ---------------------------------------------------------
+
+    // Instantiate the service
+    const gdeltService = new GdeltDataService();
+
     async function fetchDataAndProcess() {
-        console.log('処理を開始します...');
-        newsTableBody.innerHTML = '<tr><td colspan="5">最新のイベントデータを読み込んでいます...</td></tr>';
+        newsTableBody.innerHTML = '<tr><td colspan="5">Loading data...</td></tr>';
 
         try {
-            console.log('0/5: CAMEOコードと国座標データを読み込み中...');
+            // ... (JSON fetching parts remain same) ...
             const [cameoResponse, countryCodeResponse, countriesRes] = await Promise.all([
                 fetch('cameo-event-codes.json'),
                 fetch('country-coordinates.json'),
                 fetch('https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson')
             ]);
-            if (!cameoResponse.ok) throw new Error('CAMEOコード定義ファイルの取得に失敗');
-            if (!countryCodeResponse.ok) throw new Error('国コード定義ファイルの取得に失敗');
-            if (!countriesRes.ok) throw new Error('国境データ(GeoJSON)の取得に失敗');
-
+            
+            // ... (Assigning JSON data to variables) ...
             cameoCodes = await cameoResponse.json();
             countryCoordinates = await countryCodeResponse.json();
             const countriesData = await countriesRes.json();
             allCountryFeatures = countriesData.features;
 
-            console.log('1/5: 更新情報ファイルを取得中...');
-            const updateInfoUrl = 'http://data.gdeltproject.org/gdeltv2/lastupdate-translation.txt';
-            const response = await fetch(PROXY_URL + encodeURIComponent(updateInfoUrl));
-            if (!response.ok) throw new Error(`更新情報ファイルの取得に失敗 (Status: ${response.status})`);
-            const textData = await response.text();
+            // Use the Service Class
+            const csvContent = await gdeltService.getCsvData();
 
-            const zipUrlMatch = textData.match(/http:\/\/data\.gdeltproject\.org\/gdeltv2\/\d+\.translation\.export\.CSV\.zip/);
-            if (!zipUrlMatch) throw new Error('更新情報ファイル内に有効なZIP URLが見つかりませんでした。');
-            const zipUrl = zipUrlMatch[0];
+            scheduleNextUpdate();
             
-            scheduleNextUpdate(zipUrl);
-
-            console.log('2/5: ZIPファイルをダウンロード中...');
-            const zipResponse = await fetch(PROXY_URL + encodeURIComponent(zipUrl));
-            if (!zipResponse.ok) throw new Error(`ZIPファイルのダウンロードに失敗 (Status: ${zipResponse.status})`);
-            const zipData = await zipResponse.arrayBuffer();
-
-            console.log('3/5: ZIPファイルを展開中...');
-            const jszip = new JSZip();
-            const zip = await jszip.loadAsync(zipData);
-            const csvFileName = Object.keys(zip.files)[0];
-            const csvContent = await zip.file(csvFileName).async('string');
-
-            console.log('4/5: データを解析して表示準備...');
+            // Parsing and Rendering
             allEvents = parseGdeltCsv(csvContent);
 
             if (document.getElementById('toggle-3d').classList.contains('active')) {
-                if (!globe) {
-                    init3D();
-                } else {
-                    renderDataOnMap();
-                }
+                !globe ? init3D() : renderDataOnMap();
             } else {
-                if (!map) {
-                    init2D();
-                } else {
-                    renderDataOnMap();
-                }
+                !map ? init2D() : renderDataOnMap();
             }
-            
+
         } catch (error) {
-            console.error('エラーが発生しました:', error);
-            newsTableBody.innerHTML = `<tr><td colspan="5" style="color: red;">エラー: ${error.message}</td></tr>`;
+            console.error('Application Error:', error);
+            newsTableBody.innerHTML = `<tr><td colspan="5" style="color: red;">Error: ${error.message}</td></tr>`;
         }
     }
 
-    function scheduleNextUpdate(zipUrl) {
-        if (updateTimer) {
-            clearTimeout(updateTimer);
-        }
-    
-        const timestampMatch = zipUrl.match(/(\d{14})\.translation\.export\.CSV\.zip/);
-        if (!timestampMatch) {
-            console.warn('ファイル名からタイムスタンプを抽出できませんでした。自動更新は行われません。');
-            return;
-        }
-        console.log(`get ${timestampMatch}`);
-    
-        const timestamp = timestampMatch[1];
-        const year = parseInt(timestamp.substring(0, 4), 10);
-        const month = parseInt(timestamp.substring(4, 6), 10) - 1;
-        const day = parseInt(timestamp.substring(6, 8), 10);
-        const hours = parseInt(timestamp.substring(8, 10), 10);
-        const minutes = parseInt(timestamp.substring(10, 12), 10);
-        const seconds = parseInt(timestamp.substring(12, 14), 10);
-    
-        const fileDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
+    function scheduleNextUpdate() {
+        if (updateTimer) clearTimeout(updateTimer);
         
-        nextUpdateTime = new Date(fileDate.getTime() + 25 * 60 * 1000);
-    
-        const now = new Date();
-        let delay = nextUpdateTime.getTime() - now.getTime() + 1000;
-    
-        if (delay < 0) {
-            console.log('次の更新時刻を過ぎています。1分後にデータ更新を再試行します。');
-            delay = 60 * 1000; 
-        }
-    
-        console.log(`次のデータ更新は ${nextUpdateTime.toLocaleString()} ごろに予定されています。(約${Math.round(delay / 60000)}分後)`);
-    
+        // Check again in 15 minutes
+        const nextInterval = 15 * 60 * 1000;
+        
+        console.info(`[Scheduler] Next update check scheduled in ${nextInterval / 60000} minutes.`);
+        
         updateTimer = setTimeout(() => {
-            console.log('スケジュールされたデータ更新を開始します...');
             fetchDataAndProcess();
-        }, delay);
+        }, nextInterval);
     }
 
     function setupToggleButtons() {
